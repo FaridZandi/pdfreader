@@ -24,6 +24,8 @@
       #file-name { overflow: hidden; color: #635e68; font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
       .controls { margin-top: 18px; }
       .speed { width: 130px; }
+      .skip-brackets { display: flex; align-items: center; gap: 7px; min-height: 43px; margin: 0; white-space: nowrap; }
+      .skip-brackets input { width: auto; margin: 0; accent-color: #5c35b7; }
       button { flex: 1; min-height: 43px; border: 0; border-radius: 11px; background: #5c35b7; color: white; font: inherit; font-weight: 700; cursor: pointer; }
       button:hover { background: #49259c; }
       button.secondary { flex: 0 0 auto; padding: 0 16px; background: #ebe5fa; color: #482889; }
@@ -107,6 +109,10 @@
           <label for="speed">Voice speed</label>
           <input id="speed" type="number" min="0.5" max="2" step="0.1" value="1">
         </div>
+        <label class="skip-brackets" for="skip-bracketed-text" title="Skip square-bracketed citations and references during speech">
+          <input id="skip-bracketed-text" type="checkbox">
+          Skip [bracketed text]
+        </label>
         <button id="convert" type="button">Convert to speech</button>
         <button id="read-document" class="secondary" type="button" disabled>Read full screen</button>
       </div>
@@ -146,6 +152,7 @@
     <script>
       const text = document.querySelector('#text');
       const speed = document.querySelector('#speed');
+      const skipBracketedText = document.querySelector('#skip-bracketed-text');
       const button = document.querySelector('#convert');
       const pdf = document.querySelector('#pdf');
       const choosePdf = document.querySelector('#choose-pdf');
@@ -198,6 +205,18 @@
         return value.split(/\n\s*\n+/).map(item => item.replace(/\s+/g, ' ').trim()).filter(Boolean);
       }
 
+      function textForSpeech(value) {
+        if (!skipBracketedText.checked) return value;
+        let depth = 0;
+        let result = '';
+        for (const character of value) {
+          if (character === '[') { depth += 1; continue; }
+          if (character === ']' && depth) { depth -= 1; continue; }
+          if (!depth) result += character;
+        }
+        return result.replace(/\s+([,.;:!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+      }
+
       function splitForSpeech(value, limit = 440) {
         const paragraphs = splitDocumentParagraphs(value);
         const result = [];
@@ -223,9 +242,11 @@
       }
 
       async function synthesize(value, rate) {
+        const speechText = textForSpeech(value);
+        if (!speechText) throw new Error('No speakable text remains after skipping bracketed text.');
         const response = await fetch('/api/synthesize', {
           method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({text: value, speed: rate})
+          body: JSON.stringify({text: speechText, speed: rate})
         });
         if (!response.ok) {
           const message = await response.json().catch(() => ({}));
@@ -562,8 +583,9 @@
         const run = readerRun;
         readerVoiceSpeed = rate;
         readerItems = paragraphs.map(paragraph => {
-          const parts = splitForSpeech(paragraph.text);
-          return { ...paragraph, parts, blobs: Array(parts.length).fill(null), partStates: Array(parts.length).fill('queued'), partIndex: 0 };
+          const speechText = textForSpeech(paragraph.text);
+          const parts = splitForSpeech(speechText);
+          return { ...paragraph, text: speechText, parts, blobs: Array(parts.length).fill(null), partStates: Array(parts.length).fill('queued'), partIndex: 0 };
         }).filter(item => item.parts.length);
         if (!readerItems.length) return;
         readerStatus.textContent = `Opening ${readerItems.length} paragraphs in the advanced reader...`;
