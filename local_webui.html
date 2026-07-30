@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kokoro - Local Text to Speech</title>
+    <style>
+      :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f6f6fb; color: #1d1b20; }
+      main { width: min(680px, calc(100% - 32px)); box-sizing: border-box; padding: 34px; border-radius: 20px; background: #fff; box-shadow: 0 14px 45px #29125c18; }
+      h1 { margin: 0 0 6px; font-size: 1.8rem; letter-spacing: -.04em; }
+      .subtitle { margin: 0 0 26px; color: #635e68; }
+      label { display: block; margin: 0 0 8px; font-size: .9rem; font-weight: 650; }
+      textarea, input, select { width: 100%; box-sizing: border-box; border: 1px solid #d6d0db; border-radius: 11px; color: inherit; background: transparent; font: inherit; }
+      textarea { min-height: 195px; padding: 14px; line-height: 1.45; resize: vertical; }
+      textarea:focus, input:focus { outline: 3px solid #ddd4ff; border-color: #7052c9; }
+      input, select { padding: 10px; }
+      .pdf-controls, .controls { display: flex; align-items: end; gap: 12px; }
+      .pdf-controls { margin: 0 0 20px; }
+      .pdf-controls > div { flex: 1; }
+      .order-control { max-width: 195px; }
+      .file-picker { display: flex; align-items: center; gap: 10px; min-height: 43px; }
+      #choose-pdf { flex: 0 0 auto; }
+      #file-name { overflow: hidden; color: #635e68; font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
+      .controls { margin-top: 18px; }
+      .speed { width: 130px; }
+      button { flex: 1; min-height: 43px; border: 0; border-radius: 11px; background: #5c35b7; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+      button:hover { background: #49259c; }
+      button.secondary { flex: 0 0 auto; padding: 0 16px; background: #ebe5fa; color: #482889; }
+      button.secondary:hover { background: #ddd4f4; }
+      button:disabled { opacity: .58; cursor: wait; }
+      #status { min-height: 1.3em; margin: 17px 0 10px; color: #635e68; font-size: .92rem; }
+      #status.error { color: #b3261e; }
+      #pdf-status { min-height: 1.3em; margin: -12px 0 18px; color: #635e68; font-size: .85rem; }
+      audio { width: 100%; display: none; }
+      audio.ready { display: block; }
+      .footnote { margin: 22px 0 0; color: #79737d; font-size: .78rem; }
+
+      #reader { position: fixed; inset: 0; z-index: 10; display: grid; grid-template-rows: auto minmax(0, 1fr); background: #17131d; color: #f5eff8; }
+      #reader[hidden] { display: none !important; }
+      .reader-header { display: flex; align-items: center; gap: 16px; min-height: 64px; padding: 0 20px; background: #251d30; }
+      .reader-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+      #reader-close { flex: 0 0 auto; min-height: 38px; padding: 0 14px; background: #47365b; }
+      .reader-body { min-height: 0; display: grid; grid-template-columns: minmax(0, 2fr) minmax(310px, 1fr); }
+      #pdf-viewer { overflow: auto; padding: 24px; background: #3b3343; }
+      .pdf-loading { margin: 0; color: #ddd3e4; text-align: center; }
+      .pdf-page { position: relative; width: max-content; margin: 0 auto 24px; box-shadow: 0 4px 22px #0007; }
+      .pdf-page canvas { display: block; }
+      button.pdf-paragraph { position: absolute; min-height: 0; border: 1px solid transparent; border-radius: 3px; background: #0000; cursor: pointer; }
+      button.pdf-paragraph:hover { border-color: #a78bf0; background: #a78bf033; }
+      button.pdf-paragraph.status-converting { background: #f5c77633; }
+      button.pdf-paragraph.status-ready, button.pdf-paragraph.status-played { background: #8fdbb026; }
+      button.pdf-paragraph.status-playing { border-color: #ffdf83; background: #f5c77673; box-shadow: 0 0 0 2px #f5c77655; }
+      .reader-panel { min-height: 0; display: flex; flex-direction: column; border-left: 1px solid #4d405a; background: #201827; }
+      .reader-controls { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid #4d405a; }
+      #reader-toggle { flex: 0 0 auto; min-width: 86px; }
+      #reader-progress { color: #cfc2d8; font-size: .86rem; }
+      .pdf-zoom { display: flex; align-items: center; gap: 4px; }
+      .pdf-zoom button { flex: 0 0 34px; min-height: 32px; padding: 0; background: #47365b; }
+      #pdf-zoom-value { min-width: 46px; color: #ddd3e4; font-size: .78rem; text-align: center; }
+      .reader-rate { display: grid; gap: 2px; margin-left: auto; color: #cfc2d8; font-size: .72rem; }
+      #reader-playback-speed { width: 110px; padding: 0; accent-color: #9d7be5; }
+      #reader-playback-value { color: #fff; font-size: .8rem; font-variant-numeric: tabular-nums; }
+      #reader-status { min-height: 1.2em; margin: 0; padding: 10px 16px; color: #bdb0c7; font-size: .84rem; }
+      #transcript { overflow: auto; padding: 4px 16px 28px; line-height: 1.55; }
+      button.chunk { display: block; width: 100%; min-height: 0; margin: 0 0 14px; padding: 9px 10px; border-radius: 8px; background: transparent; color: #cfc5d6; font-weight: 400; text-align: left; transition: background .18s, color .18s; }
+      button.chunk:hover { background: #342a40; }
+      .chunk.active { background: #7251be; color: #fff; box-shadow: 0 0 0 1px #a88cf0 inset; }
+      .chunk-meta { display: block; margin-bottom: 3px; color: #bba6d2; font-size: .72rem; font-weight: 700; }
+      .chunk.active .chunk-meta { color: #eee8ff; }
+      .status-converting .chunk-meta { color: #f5c776; }
+      .status-ready .chunk-meta, .status-played .chunk-meta { color: #8fdbb0; }
+      .status-error .chunk-meta { color: #ffaaa4; }
+      @media (max-width: 760px) { .reader-body { grid-template-columns: 1fr; grid-template-rows: minmax(45vh, 1fr) minmax(35vh, 1fr); } .reader-panel { border-left: 0; border-top: 1px solid #4d405a; } }
+      @media (prefers-color-scheme: dark) { body { background: #16131b; color: #eae4ee; } main { background: #24202a; box-shadow: none; } .subtitle, #status { color: #cfc5d2; } textarea, input { border-color: #625b67; } button.secondary { background: #453561; color: #eee6fb; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Kokoro</h1>
+      <p class="subtitle">Local text-to-speech - American English - af_heart voice</p>
+      <div class="pdf-controls">
+        <div>
+          <label for="pdf">Open a PDF</label>
+          <div class="file-picker">
+            <button id="choose-pdf" class="secondary" type="button">Choose PDF...</button>
+            <span id="file-name">No file selected</span>
+            <input id="pdf" type="file" accept="application/pdf,.pdf" hidden>
+          </div>
+        </div>
+        <div class="order-control">
+          <label for="reading-order">Reading order</label>
+          <select id="reading-order">
+            <option value="docling" selected>Docling text-only</option>
+            <option value="docling_no_ocr">Docling text-only (no OCR)</option>
+            <option value="source">Preserve source paragraphs</option>
+            <option value="columns">Column-aware layout</option>
+          </select>
+        </div>
+        <button id="extract" type="button" disabled>Extract text</button>
+      </div>
+      <p id="pdf-status">Docling text-only is recommended for papers. It keeps image data out of the text sent to Kokoro.</p>
+      <label for="text">Text to convert</label>
+      <textarea id="text" autofocus>Local/self-hosted: Kokoro-82M. Surprisingly natural for an 82M-parameter model, fast enough to run on CPU, Apache-licensed, and effectively free after compute. Best value for English narration.</textarea>
+      <div class="controls">
+        <div class="speed">
+          <label for="speed">Voice speed</label>
+          <input id="speed" type="number" min="0.5" max="2" step="0.1" value="1">
+        </div>
+        <button id="convert" type="button">Convert to speech</button>
+        <button id="read-document" class="secondary" type="button" disabled>Read full screen</button>
+      </div>
+      <p id="status" role="status"></p>
+      <audio id="player" controls></audio>
+      <p class="footnote">PDF text and audio are processed on this Mac and are not sent to a remote service.</p>
+    </main>
+
+    <section id="reader" hidden aria-label="PDF reader">
+      <header class="reader-header">
+        <span id="reader-title" class="reader-title">PDF reader</span>
+        <button id="reader-close" type="button">Exit reader</button>
+      </header>
+      <div class="reader-body">
+        <div id="pdf-viewer" aria-label="Selected PDF"><p class="pdf-loading">The PDF will render here when reading begins.</p></div>
+        <aside class="reader-panel">
+          <div class="reader-controls">
+            <button id="reader-toggle" type="button" disabled>Pause</button>
+            <span id="reader-progress">Preparing reader...</span>
+            <div class="pdf-zoom" aria-label="PDF zoom controls">
+              <button id="pdf-zoom-out" type="button" title="Zoom out">-</button>
+              <output id="pdf-zoom-value">125%</output>
+              <button id="pdf-zoom-in" type="button" title="Zoom in">+</button>
+            </div>
+            <label class="reader-rate" for="reader-playback-speed">Playback speed
+              <input id="reader-playback-speed" type="range" min="0.5" max="2" step="0.1" value="1">
+              <output id="reader-playback-value">1.0x</output>
+            </label>
+          </div>
+          <p id="reader-status" role="status"></p>
+          <div id="transcript" aria-live="polite"></div>
+          <audio id="reader-player"></audio>
+        </aside>
+      </div>
+    </section>
+
+    <script>
+      const text = document.querySelector('#text');
+      const speed = document.querySelector('#speed');
+      const button = document.querySelector('#convert');
+      const pdf = document.querySelector('#pdf');
+      const choosePdf = document.querySelector('#choose-pdf');
+      const fileName = document.querySelector('#file-name');
+      const extract = document.querySelector('#extract');
+      const readingOrder = document.querySelector('#reading-order');
+      const readDocument = document.querySelector('#read-document');
+      const player = document.querySelector('#player');
+      const status = document.querySelector('#status');
+      const pdfStatus = document.querySelector('#pdf-status');
+      const reader = document.querySelector('#reader');
+      const readerTitle = document.querySelector('#reader-title');
+      const pdfViewer = document.querySelector('#pdf-viewer');
+      const readerPlayer = document.querySelector('#reader-player');
+      const readerToggle = document.querySelector('#reader-toggle');
+      const pdfZoomOut = document.querySelector('#pdf-zoom-out');
+      const pdfZoomIn = document.querySelector('#pdf-zoom-in');
+      const pdfZoomValue = document.querySelector('#pdf-zoom-value');
+      const readerPlaybackSpeed = document.querySelector('#reader-playback-speed');
+      const readerPlaybackValue = document.querySelector('#reader-playback-value');
+      const readerProgress = document.querySelector('#reader-progress');
+      const readerStatus = document.querySelector('#reader-status');
+      const transcript = document.querySelector('#transcript');
+      const readerClose = document.querySelector('#reader-close');
+      let audioUrl;
+      let pdfUrl;
+      let preparedParagraphs = [];
+      let pdfjsLib;
+      let pdfDocument;
+      let pdfSourceFile;
+      let pdfScale = 1.25;
+      let readerRun = 0;
+      let readerAudioUrl;
+      let readerItems = [];
+      let readerCurrentIndex = -1;
+      let readerVoiceSpeed = 1;
+      const PREFETCH_COUNT = 2;
+
+      choosePdf.addEventListener('click', () => pdf.click());
+      pdf.addEventListener('change', () => {
+        const file = pdf.files[0];
+        if (!file) return;
+        fileName.textContent = file.name;
+        extract.disabled = false;
+        readDocument.disabled = true;
+        pdfStatus.textContent = 'PDF selected. Click Extract text to prepare it for reading.';
+      });
+
+      function splitDocumentParagraphs(value) {
+        return value.split(/\n\s*\n+/).map(item => item.replace(/\s+/g, ' ').trim()).filter(Boolean);
+      }
+
+      function splitForSpeech(value, limit = 440) {
+        const paragraphs = splitDocumentParagraphs(value);
+        const result = [];
+        for (const paragraph of paragraphs) {
+          if (paragraph.length <= limit) { result.push(paragraph); continue; }
+          const sentences = paragraph.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [paragraph];
+          let current = '';
+          for (let sentence of sentences) {
+            sentence = sentence.trim();
+            if (sentence.length > limit) {
+              for (const word of sentence.split(' ')) {
+                if ((current + ' ' + word).trim().length > limit && current) { result.push(current); current = word; }
+                else current = `${current} ${word}`.trim();
+              }
+            } else if ((current + ' ' + sentence).trim().length > limit && current) {
+              result.push(current);
+              current = sentence;
+            } else current = `${current} ${sentence}`.trim();
+          }
+          if (current) result.push(current);
+        }
+        return result;
+      }
+
+      async function synthesize(value, rate) {
+        const response = await fetch('/api/synthesize', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({text: value, speed: rate})
+        });
+        if (!response.ok) {
+          const message = await response.json().catch(() => ({}));
+          throw new Error(message.error || 'Could not generate audio.');
+        }
+        return response.blob();
+      }
+
+      async function renderPdf(file, paragraphs) {
+        pdfjsLib ||= await import('/static/pdfjs/pdf.mjs');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/pdfjs/pdf.worker.mjs';
+        if (file !== pdfSourceFile) {
+          pdfSourceFile = file;
+          pdfDocument = await pdfjsLib.getDocument({data: new Uint8Array(await file.arrayBuffer())}).promise;
+        }
+        await renderPdfPages(paragraphs);
+      }
+
+      async function renderPdfPages(paragraphs) {
+        const previousScroll = pdfViewer.scrollTop;
+        pdfViewer.replaceChildren();
+        const loading = document.createElement('p');
+        loading.className = 'pdf-loading';
+        loading.textContent = 'Rendering PDF pages...';
+        pdfViewer.append(loading);
+        const paragraphsByPage = new Map();
+        paragraphs.forEach(paragraph => {
+          const boxes = paragraph.boxes || [{
+            page: paragraph.page,
+            bbox: paragraph.bbox,
+            page_size: paragraph.page_size,
+          }];
+          boxes.forEach(box => {
+            if (!box.page || !box.bbox || !box.page_size) return;
+            const pageParagraphs = paragraphsByPage.get(box.page) || [];
+            pageParagraphs.push({id: paragraph.id, box});
+            paragraphsByPage.set(box.page, pageParagraphs);
+          });
+        });
+        pdfViewer.replaceChildren();
+        for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+          const page = await pdfDocument.getPage(pageNumber);
+          const viewport = page.getViewport({scale: pdfScale});
+          const pixelRatio = window.devicePixelRatio || 1;
+          const pageElement = document.createElement('div');
+          pageElement.className = 'pdf-page';
+          pageElement.style.width = `${viewport.width}px`;
+          pageElement.style.height = `${viewport.height}px`;
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.floor(viewport.width * pixelRatio);
+          canvas.height = Math.floor(viewport.height * pixelRatio);
+          canvas.style.width = `${viewport.width}px`;
+          canvas.style.height = `${viewport.height}px`;
+          pageElement.append(canvas);
+          const context = canvas.getContext('2d');
+          await page.render({canvasContext: context, viewport, transform: [pixelRatio, 0, 0, pixelRatio, 0, 0]}).promise;
+          for (const paragraph of paragraphsByPage.get(pageNumber) || []) {
+            const {box} = paragraph;
+            const overlay = document.createElement('button');
+            overlay.type = 'button';
+            overlay.className = 'pdf-paragraph';
+            overlay.dataset.sourceId = paragraph.id;
+            overlay.title = 'Read from this paragraph';
+            overlay.style.left = `${(box.bbox.l / box.page_size.width) * 100}%`;
+            overlay.style.top = `${((box.page_size.height - box.bbox.t) / box.page_size.height) * 100}%`;
+            overlay.style.width = `${((box.bbox.r - box.bbox.l) / box.page_size.width) * 100}%`;
+            overlay.style.height = `${((box.bbox.t - box.bbox.b) / box.page_size.height) * 100}%`;
+            overlay.addEventListener('click', () => jumpToSource(paragraph.id));
+            pageElement.append(overlay);
+          }
+          pdfViewer.append(pageElement);
+        }
+        pdfViewer.scrollTop = previousScroll;
+        pdfZoomValue.textContent = `${Math.round(pdfScale * 100)}%`;
+        refreshPdfHighlights();
+      }
+
+      async function changePdfZoom(change) {
+        if (!pdfDocument) return;
+        pdfScale = Math.max(0.75, Math.min(2.5, Math.round((pdfScale + change) * 100) / 100));
+        try {
+          await renderPdfPages(preparedParagraphs);
+        } catch (error) {
+          readerStatus.textContent = `PDF zoom failed: ${error.message}`;
+        }
+      }
+
+      function refreshPdfHighlights() {
+        pdfViewer.querySelectorAll('.pdf-paragraph').forEach(overlay => {
+          const sourceItems = readerItems.filter(item => item.sourceId === overlay.dataset.sourceId);
+          const statuses = sourceItems.map(statusForItem);
+          const status = statuses.includes('playing') ? 'playing'
+            : statuses.includes('converting') ? 'converting'
+            : statuses.includes('ready') ? 'ready'
+            : statuses.length && statuses.every(item => item === 'played') ? 'played' : 'queued';
+          overlay.className = `pdf-paragraph status-${status}`;
+        });
+      }
+
+      function jumpToSource(sourceId) {
+        const index = readerItems.findIndex(item => item.sourceId === sourceId && statusForItem(item) !== 'played');
+        jumpToParagraph(index >= 0 ? index : readerItems.findIndex(item => item.sourceId === sourceId));
+      }
+
+      function statusForItem(item) {
+        const states = item.partStates;
+        if (states.every(state => state === 'played')) return 'played';
+        if (states.includes('playing')) return 'playing';
+        if (states.includes('converting')) return 'converting';
+        if (states.includes('ready')) return 'ready';
+        if (states.includes('error')) return 'error';
+        return 'queued';
+      }
+
+      function renderTranscript() {
+        transcript.replaceChildren();
+        readerItems.forEach((item, index) => {
+          const element = document.createElement('button');
+          element.type = 'button';
+          element.className = `chunk status-${statusForItem(item)}${index === readerCurrentIndex ? ' active' : ''}`;
+          const meta = document.createElement('span');
+          meta.className = 'chunk-meta';
+          meta.textContent = `Paragraph ${index + 1} - ${statusForItem(item)}`;
+          const body = document.createElement('span');
+          body.textContent = item.text;
+          element.append(meta, body);
+          element.addEventListener('click', () => jumpToParagraph(index));
+          transcript.append(element);
+        });
+        refreshTranscript();
+      }
+
+      function refreshTranscript() {
+        transcript.querySelectorAll('.chunk').forEach((element, index) => {
+          const item = readerItems[index];
+          const status = statusForItem(item);
+          element.className = `chunk status-${status}${index === readerCurrentIndex ? ' active' : ''}`;
+          element.querySelector('.chunk-meta').textContent = `Paragraph ${index + 1} - ${status}`;
+        });
+        if (readerCurrentIndex >= 0) {
+          readerProgress.textContent = `Paragraph ${readerCurrentIndex + 1} of ${readerItems.length}`;
+        }
+        refreshPdfHighlights();
+      }
+
+      function focusParagraph(index, reveal = false) {
+        readerCurrentIndex = index;
+        refreshTranscript();
+        if (reveal) transcript.querySelector('.chunk.active')?.scrollIntoView({block: 'nearest', behavior: 'auto'});
+        if (reveal) pdfViewer.querySelector(`.pdf-paragraph[data-source-id="${readerItems[index]?.sourceId}"]`)?.scrollIntoView({block: 'center', behavior: 'auto'});
+      }
+
+      function unloadReaderAudio() {
+        readerPlayer.pause();
+        readerPlayer.removeAttribute('src');
+        readerPlayer.load();
+        if (readerAudioUrl) URL.revokeObjectURL(readerAudioUrl);
+        readerAudioUrl = undefined;
+      }
+
+      function stopReader() {
+        readerRun += 1;
+        unloadReaderAudio();
+        readerItems = [];
+        readerCurrentIndex = -1;
+        reader.hidden = true;
+        readerToggle.disabled = true;
+        if (document.fullscreenElement === reader) document.exitFullscreen().catch(() => {});
+      }
+
+      function jumpToParagraph(index) {
+        if (reader.hidden || index < 0 || index >= readerItems.length) return;
+        const previous = readerItems[readerCurrentIndex];
+        if (previous?.partStates[previous.partIndex] === 'playing') previous.partStates[previous.partIndex] = 'ready';
+        const target = readerItems[index];
+        target.partIndex = 0;
+        target.partStates = target.partStates.map(state => state === 'played' ? 'ready' : state === 'error' ? 'queued' : state);
+        unloadReaderAudio();
+        readerToggle.disabled = true;
+        focusParagraph(index);
+        readerStatus.textContent = `Preparing paragraph ${index + 1}...`;
+        startCurrentParagraph(readerRun);
+      }
+
+      function pumpConversionQueue(run) {
+        if (run !== readerRun || reader.hidden || readerItems.some(item => item.partStates.includes('converting'))) return;
+        const lastIndex = Math.min(readerCurrentIndex + PREFETCH_COUNT, readerItems.length - 1);
+        let itemIndex = -1;
+        let partIndex = -1;
+        for (let i = readerCurrentIndex; i <= lastIndex; i += 1) {
+          const queuedPart = readerItems[i]?.partStates.findIndex(state => state === 'queued') ?? -1;
+          if (queuedPart >= 0) { itemIndex = i; partIndex = queuedPart; break; }
+        }
+        if (itemIndex < 0) return;
+        const item = readerItems[itemIndex];
+        item.partStates[partIndex] = 'converting';
+        refreshTranscript();
+        synthesize(item.parts[partIndex], readerVoiceSpeed)
+          .then(blob => {
+            if (run !== readerRun) return;
+            item.blobs[partIndex] = blob;
+            item.partStates[partIndex] = 'ready';
+            refreshTranscript();
+            if (itemIndex === readerCurrentIndex && item.partIndex === partIndex) startCurrentParagraph(run);
+            pumpConversionQueue(run);
+          })
+          .catch(error => {
+            if (run !== readerRun) return;
+            item.partStates[partIndex] = 'error';
+            item.error = error.message;
+            refreshTranscript();
+            if (itemIndex === readerCurrentIndex && item.partIndex === partIndex) {
+              readerStatus.textContent = `Paragraph ${itemIndex + 1} failed: ${error.message}`;
+              readerToggle.disabled = true;
+            }
+            pumpConversionQueue(run);
+          });
+      }
+
+      function startCurrentParagraph(run) {
+        if (run !== readerRun || readerCurrentIndex < 0) return;
+        const item = readerItems[readerCurrentIndex];
+        const partIndex = item.partIndex;
+        const partState = item.partStates[partIndex];
+        if (partState === 'queued' || partState === 'converting') {
+          readerStatus.textContent = `Converting paragraph ${readerCurrentIndex + 1}...`;
+          readerToggle.disabled = true;
+          pumpConversionQueue(run);
+          return;
+        }
+        if (partState === 'error') return;
+        unloadReaderAudio();
+        item.partStates[partIndex] = 'playing';
+        readerAudioUrl = URL.createObjectURL(item.blobs[partIndex]);
+        readerPlayer.src = readerAudioUrl;
+        readerPlayer.playbackRate = Number(readerPlaybackSpeed.value);
+        readerPlayer.onended = () => {
+          if (run !== readerRun) return;
+          item.partStates[partIndex] = 'played';
+          if (partIndex + 1 < item.parts.length) {
+            item.partIndex += 1;
+            refreshTranscript();
+            startCurrentParagraph(run);
+            return;
+          }
+          const nextIndex = readerCurrentIndex + 1;
+          if (nextIndex >= readerItems.length) {
+            refreshTranscript();
+            readerStatus.textContent = 'Finished reading.';
+            readerToggle.disabled = true;
+            return;
+          }
+          focusParagraph(nextIndex, true);
+          startCurrentParagraph(run);
+        };
+        readerToggle.disabled = false;
+        readerToggle.textContent = 'Pause';
+        refreshTranscript();
+        readerStatus.textContent = 'Playing. The conversion queue is preparing upcoming paragraphs.';
+        pumpConversionQueue(run);
+        readerPlayer.play().catch(() => {
+          readerToggle.textContent = 'Play';
+          readerStatus.textContent = 'Audio is ready. Press Play to begin reading.';
+        });
+      }
+
+      extract.addEventListener('click', async () => {
+        const file = pdf.files[0];
+        if (!file) { pdfStatus.textContent = 'Choose a PDF first.'; return; }
+        extract.disabled = true;
+        readDocument.disabled = true;
+        pdfStatus.textContent = `Extracting text from ${file.name}...`;
+        try {
+          const response = await fetch('/api/extract-pdf', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/pdf', 'X-Reading-Order': readingOrder.value},
+            body: file
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Could not extract the PDF.');
+          text.value = result.text;
+          preparedParagraphs = result.paragraphs || [];
+          if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+          readerTitle.textContent = file.name;
+          readDocument.disabled = false;
+          text.focus();
+          pdfStatus.textContent = `Loaded ${file.name}. If the text order is wrong, choose a fallback and extract again.`;
+        } catch (error) {
+          pdfStatus.textContent = error.message;
+        } finally {
+          extract.disabled = false;
+        }
+      });
+
+      button.addEventListener('click', async () => {
+        const value = text.value.trim();
+        if (!value) { status.textContent = 'Enter some text first.'; status.className = 'error'; return; }
+        if (value.length > 4000) { status.textContent = 'Use Read full screen for documents longer than 4,000 characters.'; status.className = 'error'; return; }
+        button.disabled = true;
+        status.textContent = 'Generating audio locally...';
+        status.className = '';
+        try {
+          if (audioUrl) URL.revokeObjectURL(audioUrl);
+          audioUrl = URL.createObjectURL(await synthesize(value, Number(speed.value)));
+          player.src = audioUrl;
+          player.classList.add('ready');
+          await player.play().catch(() => {});
+          status.textContent = 'Ready - use the player controls to listen or download.';
+        } catch (error) {
+          status.textContent = error.message;
+          status.className = 'error';
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      readDocument.addEventListener('click', async () => {
+        const value = text.value.trim();
+        if (!pdf.files[0] || !value) {
+          pdfStatus.textContent = 'Choose and extract a PDF before opening the reader.';
+          return;
+        }
+        const rate = Number(speed.value);
+        if (!Number.isFinite(rate) || rate < 0.5 || rate > 2) {
+          pdfStatus.textContent = 'Choose a speed between 0.5 and 2.0 before starting the reader.';
+          return;
+        }
+        const paragraphs = preparedParagraphs.length
+          ? preparedParagraphs.map(paragraph => ({text: paragraph.text, sourceId: paragraph.id}))
+          : splitDocumentParagraphs(value).map(text => ({text, sourceId: null}));
+        if (!paragraphs.length) return;
+        reader.hidden = false;
+        readerRun += 1;
+        const run = readerRun;
+        readerVoiceSpeed = rate;
+        readerItems = paragraphs.map(paragraph => {
+          const parts = splitForSpeech(paragraph.text);
+          return { ...paragraph, parts, blobs: Array(parts.length).fill(null), partStates: Array(parts.length).fill('queued'), partIndex: 0 };
+        }).filter(item => item.parts.length);
+        if (!readerItems.length) return;
+        readerStatus.textContent = `Opening ${readerItems.length} paragraphs in the advanced reader...`;
+        readerCurrentIndex = 0;
+        renderTranscript();
+        focusParagraph(0);
+        try {
+          await renderPdf(pdf.files[0], preparedParagraphs);
+          startCurrentParagraph(run);
+        } catch (error) {
+          readerStatus.textContent = `PDF rendering failed: ${error.message}`;
+          readerToggle.disabled = true;
+        }
+      });
+
+      readerPlaybackSpeed.addEventListener('input', () => {
+        const rate = Number(readerPlaybackSpeed.value);
+        readerPlaybackValue.textContent = `${rate.toFixed(1)}x`;
+        readerPlayer.playbackRate = rate;
+      });
+
+      pdfZoomOut.addEventListener('click', () => changePdfZoom(-0.15));
+      pdfZoomIn.addEventListener('click', () => changePdfZoom(0.15));
+
+      readerToggle.addEventListener('click', () => {
+        if (readerPlayer.paused) { readerPlayer.play(); readerToggle.textContent = 'Pause'; }
+        else { readerPlayer.pause(); readerToggle.textContent = 'Play'; readerStatus.textContent = 'Paused.'; }
+      });
+      readerClose.addEventListener('click', stopReader);
+      document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && !reader.hidden) reader.focus?.(); });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+.venv/
+.hf-cache/
+node_modules/
+webui_static/pdfjs/
+tmp/
+__pycache__/
+*.py[cod]

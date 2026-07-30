@@ -1,0 +1,33 @@
+name: Verify local reader setup
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install speech system dependency
+        run: sudo apt-get update && sudo apt-get install -y espeak-ng
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Install and prepare PDF.js
+        run: |
+          npm ci
+          npm run sync-pdfjs
+      - name: Check application syntax
+        run: |
+          python -m py_compile local_webui.py
+          node -e "const fs=require('fs'); const html=fs.readFileSync('local_webui.html','utf8'); const script=html.match(/<script>([\\s\\S]*)<\\/script>/)?.[1]; if (!script) throw new Error('script not found'); new Function(script);"
