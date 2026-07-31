@@ -1378,7 +1378,7 @@
         readerAudioUrl = URL.createObjectURL(item.blobs[partIndex]);
         readerPlayer.src = readerAudioUrl;
         readerPlayer.playbackRate = Number(readerPlaybackSpeed.value);
-        if ('mediaSession' in navigator) {
+        if ('mediaSession' in navigator && 'MediaMetadata' in window) {
           navigator.mediaSession.metadata = new MediaMetadata({title: currentSection(), artist: readerTitle.textContent, album: 'PDF Reader'});
           navigator.mediaSession.setActionHandler('play', () => readerPlayer.play());
           navigator.mediaSession.setActionHandler('pause', () => readerPlayer.pause());
