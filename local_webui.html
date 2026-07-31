@@ -68,6 +68,18 @@
       .reader-rate { display: grid; gap: 2px; margin-left: auto; color: #cfc2d8; font-size: .72rem; }
       #reader-playback-speed { width: 110px; padding: 0; accent-color: #9d7be5; }
       #reader-playback-value { color: #fff; font-size: .8rem; font-variant-numeric: tabular-nums; }
+      .reader-actions, .reader-search { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #4d405a; }
+      .reader-actions button, .reader-search button { flex: 0 0 auto; min-height: 32px; padding: 0 9px; background: #47365b; font-size: .78rem; }
+      .reader-search input { min-width: 0; padding: 7px 9px; font-size: .82rem; }
+      #reader-search-count { min-width: 3.5em; color: #bdb0c7; font-size: .75rem; text-align: right; }
+      #reader-drawer { overflow: auto; max-height: 32%; padding: 10px 16px; border-bottom: 1px solid #4d405a; background: #19141f; }
+      #reader-drawer[hidden] { display: none; }
+      #reader-drawer h3 { margin: 0 0 8px; font-size: .86rem; color: #e6dced; }
+      #reader-drawer p { margin: 0; color: #bdb0c7; font-size: .8rem; }
+      button.drawer-item { display: block; width: 100%; min-height: 0; margin: 0 0 6px; padding: 7px 8px; border-radius: 6px; background: transparent; color: #ddd3e4; font-size: .82rem; font-weight: 500; text-align: left; }
+      button.drawer-item:hover { background: #342a40; }
+      button.drawer-item .drawer-meta { display: block; margin-top: 2px; color: #bba6d2; font-size: .7rem; }
+      mark { padding: 0 1px; border-radius: 2px; background: #f4c95d; color: #211b11; }
       #reader-status { min-height: 1.2em; margin: 0; padding: 10px 16px; color: #bdb0c7; font-size: .84rem; }
       #transcript { overflow: auto; padding: 4px 16px 28px; line-height: 1.55; }
       button.chunk { display: block; width: 100%; min-height: 0; margin: 0 0 14px; padding: 9px 10px; border-radius: 8px; background: transparent; color: #cfc5d6; font-weight: 400; text-align: left; transition: background .18s, color .18s; }
@@ -163,6 +175,18 @@
               <output id="reader-playback-value">1.0x</output>
             </label>
           </div>
+          <div class="reader-actions">
+            <button id="reader-outline" type="button" disabled>Outline</button>
+            <button id="reader-bookmark" type="button" disabled>Bookmark</button>
+            <button id="reader-bookmarks" type="button" disabled>Bookmarks</button>
+          </div>
+          <div class="reader-search">
+            <input id="reader-search" type="search" placeholder="Search this reading queue" aria-label="Search this reading queue">
+            <button id="reader-search-prev" type="button" disabled>↑</button>
+            <button id="reader-search-next" type="button" disabled>↓</button>
+            <span id="reader-search-count">0 results</span>
+          </div>
+          <section id="reader-drawer" hidden aria-live="polite"></section>
           <p id="reader-status" role="status"></p>
           <div id="transcript" aria-live="polite"></div>
           <audio id="reader-player"></audio>
@@ -215,6 +239,14 @@
       const readerHelp = document.querySelector('#reader-help');
       const readerHelpDialog = document.querySelector('#reader-help-dialog');
       const readerHelpClose = document.querySelector('#reader-help-close');
+      const readerOutline = document.querySelector('#reader-outline');
+      const readerBookmark = document.querySelector('#reader-bookmark');
+      const readerBookmarksButton = document.querySelector('#reader-bookmarks');
+      const readerSearch = document.querySelector('#reader-search');
+      const readerSearchPrev = document.querySelector('#reader-search-prev');
+      const readerSearchNext = document.querySelector('#reader-search-next');
+      const readerSearchCount = document.querySelector('#reader-search-count');
+      const readerDrawer = document.querySelector('#reader-drawer');
       let audioUrl;
       let pdfUrl;
       let preparedParagraphs = [];
@@ -223,6 +255,13 @@
       let currentDocumentKey;
       let pendingResume;
       let documentSelectionVersion = 0;
+      let readerOutlineItems = [];
+      let readerSearchResults = [];
+      let readerSearchResultIndex = -1;
+      let readerBookmarks = [];
+      let readerSessionStartedAt = 0;
+      let readerCompletedCharacters = 0;
+      let readerCompletedSeconds = 0;
       let pdfjsLib;
       let pdfDocument;
       let pdfSourceFile;
@@ -352,6 +391,92 @@
         readDocument.disabled = !preparedParagraphs.length;
         pdfStatus.textContent = `${filterSummaryMessage(lastFilterSummary)} This preset was applied locally without re-extracting.`;
         return true;
+      }
+
+      function normaliseSearchText(value) {
+        return value.replace(/\s+/g, ' ').trim().toLocaleLowerCase();
+      }
+
+      function openReaderDatabase() {
+        return new Promise((resolve, reject) => {
+          if (!window.indexedDB) { reject(new Error('IndexedDB is unavailable in this browser.')); return; }
+          const request = indexedDB.open('pdfreader', 1);
+          request.onupgradeneeded = () => {
+            const database = request.result;
+            if (!database.objectStoreNames.contains('bookmarks')) {
+              const store = database.createObjectStore('bookmarks', {keyPath: 'id'});
+              store.createIndex('documentKey', 'documentKey', {unique: false});
+            }
+          };
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error || new Error('Could not open local bookmark storage.'));
+        });
+      }
+
+      async function listBookmarks() {
+        if (!currentDocumentKey) return [];
+        const database = await openReaderDatabase();
+        try {
+          return await new Promise((resolve, reject) => {
+            const request = database.transaction('bookmarks', 'readonly').objectStore('bookmarks').index('documentKey').getAll(currentDocumentKey);
+            request.onsuccess = () => resolve(request.result.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+            request.onerror = () => reject(request.error);
+          });
+        } finally { database.close(); }
+      }
+
+      async function createBookmark() {
+        const item = readerItems[readerCurrentIndex];
+        if (!currentDocumentKey || !item?.sourceId) {
+          readerStatus.textContent = 'Select this PDF again before saving a source-linked bookmark.';
+          return;
+        }
+        const note = window.prompt('Optional bookmark note:', '');
+        if (note === null) return;
+        const bookmark = {
+          id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+          documentKey: currentDocumentKey,
+          sourceId: item.sourceId,
+          note: note.trim(),
+          excerpt: item.text.slice(0, 240),
+          createdAt: new Date().toISOString(),
+        };
+        try {
+          const database = await openReaderDatabase();
+          await new Promise((resolve, reject) => {
+            const request = database.transaction('bookmarks', 'readwrite').objectStore('bookmarks').put(bookmark);
+            request.onsuccess = resolve;
+            request.onerror = () => reject(request.error);
+          });
+          database.close();
+          readerBookmarks = await listBookmarks();
+          readerStatus.textContent = 'Bookmark saved locally.';
+        } catch (error) { readerStatus.textContent = error.message; }
+      }
+
+      function currentSection(index = readerCurrentIndex) {
+        for (let itemIndex = index; itemIndex >= 0; itemIndex -= 1) {
+          const item = readerItems[itemIndex];
+          if (item?.label === 'title' || item?.label === 'section_header') return item.text;
+        }
+        return 'Introduction';
+      }
+
+      function updateReaderProgress() {
+        if (readerCurrentIndex < 0 || !readerItems.length) return;
+        const elapsedSeconds = readerSessionStartedAt ? (Date.now() - readerSessionStartedAt) / 1000 : 0;
+        let remaining = '';
+        if (readerCompletedCharacters >= 80 && readerCompletedSeconds > 0) {
+          const averageSecondsPerCharacter = readerCompletedSeconds / readerCompletedCharacters;
+          const remainingCharacters = readerItems.slice(readerCurrentIndex).reduce((total, item, index) => {
+            const startPart = index === 0 ? item.partIndex : 0;
+            return total + item.parts.slice(startPart).join(' ').length;
+          }, 0);
+          const seconds = Math.round(remainingCharacters * averageSecondsPerCharacter);
+          const minutes = Math.floor(seconds / 60);
+          remaining = ` · ~${minutes ? `${minutes}m ` : ''}${seconds % 60}s left`;
+        }
+        readerProgress.textContent = `Paragraph ${readerCurrentIndex + 1} of ${readerItems.length} · ${currentSection()} · ${Math.floor(elapsedSeconds / 60)}m listened${remaining}`;
       }
 
       function loadPreferences() {
@@ -634,12 +759,24 @@
           meta.className = 'chunk-meta';
           meta.textContent = `Paragraph ${index + 1} - ${statusForItem(item)}`;
           const body = document.createElement('span');
-          body.textContent = item.text;
+          appendHighlightedText(body, item.text, readerSearch.value);
           element.append(meta, body);
           element.addEventListener('click', () => jumpToParagraph(index));
           transcript.append(element);
         });
         refreshTranscript();
+      }
+
+      function appendHighlightedText(container, value, query) {
+        const normalisedQuery = normaliseSearchText(query || '');
+        if (!normalisedQuery) { container.textContent = value; return; }
+        const match = value.toLocaleLowerCase().indexOf(normalisedQuery);
+        if (match < 0) { container.textContent = value; return; }
+        container.append(
+          document.createTextNode(value.slice(0, match)),
+          Object.assign(document.createElement('mark'), {textContent: value.slice(match, match + normalisedQuery.length)}),
+          document.createTextNode(value.slice(match + normalisedQuery.length)),
+        );
       }
 
       function refreshTranscript() {
@@ -649,9 +786,7 @@
           element.className = `chunk status-${status}${index === readerCurrentIndex ? ' active' : ''}`;
           element.querySelector('.chunk-meta').textContent = `Paragraph ${index + 1} - ${status}`;
         });
-        if (readerCurrentIndex >= 0) {
-          readerProgress.textContent = `Paragraph ${readerCurrentIndex + 1} of ${readerItems.length}`;
-        }
+        updateReaderProgress();
         refreshPdfHighlights();
       }
 
@@ -661,6 +796,94 @@
         if (reveal) transcript.querySelector('.chunk.active')?.scrollIntoView({block: 'nearest', behavior: 'auto'});
         if (reveal) pdfViewer.querySelector(`.pdf-paragraph[data-source-id="${readerItems[index]?.sourceId}"]`)?.scrollIntoView({block: 'center', behavior: 'auto'});
         saveDocumentResume();
+      }
+
+      function revealParagraph(index) {
+        transcript.children[index]?.scrollIntoView({block: 'nearest', behavior: 'auto'});
+        pdfViewer.querySelector(`.pdf-paragraph[data-source-id="${readerItems[index]?.sourceId}"]`)?.scrollIntoView({block: 'center', behavior: 'auto'});
+      }
+
+      function headingDepth(value) {
+        const match = value.match(/^\s*(\d+(?:\.\d+)*)\b/);
+        return match ? Math.min(match[1].split('.').length, 3) : 1;
+      }
+
+      function buildOutline() {
+        readerOutlineItems = readerItems.flatMap((item, index) => (
+          item.label === 'title' || item.label === 'section_header'
+            ? [{index, sourceId: item.sourceId, text: item.text, depth: headingDepth(item.text)}] : []
+        ));
+        readerOutline.disabled = !readerOutlineItems.length;
+      }
+
+      function openDrawer(title, items, emptyMessage) {
+        readerDrawer.replaceChildren();
+        const heading = document.createElement('h3');
+        heading.textContent = title;
+        readerDrawer.append(heading);
+        if (!items.length) {
+          const empty = document.createElement('p');
+          empty.textContent = emptyMessage;
+          readerDrawer.append(empty);
+        } else items.forEach(item => readerDrawer.append(item));
+        readerDrawer.hidden = false;
+      }
+
+      function showOutline() {
+        const items = readerOutlineItems.map(item => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'drawer-item';
+          button.style.paddingLeft = `${8 + ((item.depth - 1) * 14)}px`;
+          button.textContent = item.text;
+          button.addEventListener('click', () => jumpToParagraph(item.index));
+          return button;
+        });
+        openDrawer('Outline', items, 'No section headings were detected in this reading queue.');
+      }
+
+      function showBookmarks() {
+        const sourceIndices = new Map(readerItems.map((item, index) => [item.sourceId, index]));
+        const items = readerBookmarks.map(bookmark => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'drawer-item';
+          const index = sourceIndices.get(bookmark.sourceId);
+          button.textContent = bookmark.note || bookmark.excerpt || 'Bookmark';
+          const meta = document.createElement('span');
+          meta.className = 'drawer-meta';
+          meta.textContent = index === undefined ? 'Paragraph moved; use the saved excerpt to find it.' : `Paragraph ${index + 1}`;
+          button.append(meta);
+          button.addEventListener('click', () => {
+            if (index === undefined) { readerSearch.value = bookmark.excerpt; updateSearchResults(); return; }
+            jumpToParagraph(index);
+          });
+          return button;
+        });
+        openDrawer('Bookmarks', items, 'No bookmarks saved for this PDF.');
+      }
+
+      function updateSearchResults() {
+        const query = normaliseSearchText(readerSearch.value);
+        readerSearchResults = query ? readerItems.flatMap((item, index) => normaliseSearchText(item.text).includes(query) ? [{index, item}] : []) : [];
+        readerSearchResultIndex = readerSearchResults.length ? 0 : -1;
+        readerSearchCount.textContent = `${readerSearchResults.length} result${readerSearchResults.length === 1 ? '' : 's'}`;
+        readerSearchPrev.disabled = !readerSearchResults.length;
+        readerSearchNext.disabled = !readerSearchResults.length;
+        renderTranscript();
+      }
+
+      function moveSearchResult(change) {
+        if (!readerSearchResults.length) return;
+        readerSearchResultIndex = (readerSearchResultIndex + change + readerSearchResults.length) % readerSearchResults.length;
+        const result = readerSearchResults[readerSearchResultIndex];
+        revealParagraph(result.index);
+        const readFromHere = document.createElement('button');
+        readFromHere.type = 'button';
+        readFromHere.className = 'drawer-item';
+        readFromHere.textContent = `Read from here: ${result.item.text.slice(0, 180)}`;
+        readFromHere.addEventListener('click', () => jumpToParagraph(result.index));
+        openDrawer(`Search result ${readerSearchResultIndex + 1} of ${readerSearchResults.length}`, [readFromHere], '');
       }
 
       function unloadReaderAudio() {
@@ -753,6 +976,8 @@
         readerPlayer.onended = () => {
           if (run !== readerRun) return;
           item.partStates[partIndex] = 'played';
+          readerCompletedCharacters += item.parts[partIndex].length;
+          readerCompletedSeconds += (readerPlayer.duration || 0) / Math.max(Number(readerPlaybackSpeed.value), 0.1);
           if (partIndex + 1 < item.parts.length) {
             item.partIndex += 1;
             refreshTranscript();
@@ -854,7 +1079,7 @@
           return;
         }
         const paragraphs = preparedParagraphs.length
-          ? preparedParagraphs.map(paragraph => ({text: paragraph.text, sourceId: paragraph.id}))
+          ? preparedParagraphs.map(paragraph => ({...paragraph, text: paragraph.text, sourceId: paragraph.id}))
           : splitDocumentParagraphs(value).map(text => ({text, sourceId: null}));
         if (!paragraphs.length) return;
         reader.hidden = false;
@@ -867,6 +1092,22 @@
           return { ...paragraph, text: speechText, parts, blobs: Array(parts.length).fill(null), partStates: Array(parts.length).fill('queued'), partIndex: 0 };
         }).filter(item => item.parts.length);
         if (!readerItems.length) return;
+        readerSessionStartedAt = Date.now();
+        readerCompletedCharacters = 0;
+        readerCompletedSeconds = 0;
+        readerSearch.value = '';
+        readerSearchResults = [];
+        readerSearchResultIndex = -1;
+        readerSearchCount.textContent = '0 results';
+        readerSearchPrev.disabled = true;
+        readerSearchNext.disabled = true;
+        readerDrawer.hidden = true;
+        buildOutline();
+        readerBookmark.disabled = !currentDocumentKey;
+        readerBookmarksButton.disabled = !currentDocumentKey;
+        if (currentDocumentKey) {
+          try { readerBookmarks = await listBookmarks(); } catch { readerBookmarks = []; }
+        } else readerBookmarks = [];
         readerStatus.textContent = `Opening ${readerItems.length} paragraphs in the advanced reader...`;
         const resumeIndex = pendingResume?.sourceId === undefined || pendingResume?.sourceId === null
           ? -1
@@ -929,6 +1170,15 @@
 
       readerToggle.addEventListener('click', toggleReaderPlayback);
       readerClose.addEventListener('click', stopReader);
+      readerOutline.addEventListener('click', showOutline);
+      readerBookmark.addEventListener('click', createBookmark);
+      readerBookmarksButton.addEventListener('click', async () => {
+        try { readerBookmarks = await listBookmarks(); showBookmarks(); }
+        catch (error) { readerStatus.textContent = error.message; }
+      });
+      readerSearch.addEventListener('input', updateSearchResults);
+      readerSearchNext.addEventListener('click', () => moveSearchResult(1));
+      readerSearchPrev.addEventListener('click', () => moveSearchResult(-1));
       readerHelp.addEventListener('click', () => { readerHelpDialog.hidden = false; readerHelpClose.focus(); });
       readerHelpClose.addEventListener('click', () => { readerHelpDialog.hidden = true; readerHelp.focus(); });
       document.addEventListener('keydown', event => {

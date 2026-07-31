@@ -44,6 +44,8 @@ When you select a PDF, the browser calculates a SHA-256 digest locally. It uses 
 
 In the full-page reader, use `Space` to play/pause, `J`/`K` to move between paragraphs, `[`/`]` to change playback rate, `-`/`=` to zoom, and `Escape` to exit. The **Shortcuts** button shows the same list.
 
+The reader derives a section outline from Docling titles and section headers, and searches the current reading queue entirely in the browser. Search results scroll to their source PDF paragraph and offer an explicit **Read from here** action. **Bookmarks** store only the PDF digest, source paragraph id, optional note, timestamp, and a short recovery excerpt in the browser's IndexedDB database; no source PDF is copied there. If an extraction later changes its paragraph ids, the saved excerpt is offered as a local search query instead of silently moving the bookmark.
+
 ## Development workflow
 
 ```bash
