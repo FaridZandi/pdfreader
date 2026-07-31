@@ -71,16 +71,36 @@ def _is_page_edge(paragraph: dict[str, object]) -> bool:
     return True
 
 
-def _looks_like_figure_label(paragraph: dict[str, object], caption_pages: set[int]) -> bool:
+def _looks_like_figure_label(
+    paragraph: dict[str, object],
+    caption_boxes: list[dict[str, object]],
+) -> bool:
     value = str(paragraph.get("text", "")).strip()
     if re.fullmatch(r"(?:fig(?:ure)?|table)\.?\s*\d+[a-z]?", value, flags=re.IGNORECASE):
         return True
-    page = _primary_page(paragraph)
-    return bool(
-        page in caption_pages
-        and paragraph.get("label") in {"text", "list_item"}
-        and re.fullmatch(r"(?:\d+|[a-z])", value, flags=re.IGNORECASE)
-    )
+    if paragraph.get("label") not in {"text", "list_item"} or not re.fullmatch(
+        r"(?:\d+|[a-z])", value, flags=re.IGNORECASE
+    ):
+        return False
+    for box in paragraph.get("boxes", []):
+        page = box.get("page")
+        bbox = box.get("bbox", {})
+        page_size = box.get("page_size", {})
+        height = float(page_size.get("height", 0))
+        if not height:
+            continue
+        center = (float(bbox.get("t", 0)) + float(bbox.get("b", 0))) / 2
+        for caption_box in caption_boxes:
+            if caption_box.get("page") != page:
+                continue
+            caption_bbox = caption_box.get("bbox", {})
+            caption_center = (float(caption_bbox.get("t", 0)) + float(caption_bbox.get("b", 0))) / 2
+            # Panel labels sit beside a figure/caption, rather than merely
+            # sharing its page.  Ten percent of the page height is tolerant of
+            # normal caption spacing but avoids dropping ordinary singleton text.
+            if abs(center - caption_center) <= height * 0.1:
+                return True
+    return False
 
 
 def _looks_like_reference_entry(paragraph: dict[str, object]) -> bool:
@@ -101,7 +121,12 @@ def annotate_filter_reasons(paragraphs: list[dict[str, object]]) -> list[dict[st
             occurrences.setdefault(normalized, set()).add(page)
     repeated_edge_text = {value for value, pages in occurrences.items() if len(pages) >= 2}
 
-    caption_pages = {page for paragraph in paragraphs if paragraph.get("label") == "caption" if (page := _primary_page(paragraph)) is not None}
+    caption_boxes = [
+        box
+        for paragraph in paragraphs
+        if paragraph.get("label") == "caption"
+        for box in paragraph.get("boxes", [])
+    ]
     annotated: list[dict[str, object]] = []
     reference_section = False
     for paragraph in paragraphs:
@@ -118,7 +143,7 @@ def annotate_filter_reasons(paragraphs: list[dict[str, object]]) -> list[dict[st
             reference_section = True
         elif reference_section and _looks_like_reference_entry(paragraph):
             reasons.append("reference_entry")
-        if _looks_like_figure_label(paragraph, caption_pages):
+        if _looks_like_figure_label(paragraph, caption_boxes):
             reasons.append("figure_label")
         if label in {"text", "list_item"} and len(value.split()) == 1:
             reasons.append("isolated_token")

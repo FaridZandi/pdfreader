@@ -59,6 +59,16 @@ class ProseFilteringTests(unittest.TestCase):
         self.assertIn("reference_entry", all_paragraphs[2]["filter_reasons"])
         self.assertIn("isolated_token", all_paragraphs[3]["filter_reasons"])
 
+    def test_bare_panel_label_requires_a_nearby_caption(self):
+        all_paragraphs = annotate_filter_reasons([
+            paragraph("caption", "Figure 2. A nearby caption.", "caption", page=2, top=450, bottom=480),
+            paragraph("nearby-label", "a", "text", page=2, top=470, bottom=480),
+            paragraph("far-label", "b", "text", page=2, top=100, bottom=110),
+        ])
+
+        self.assertIn("figure_label", all_paragraphs[1]["filter_reasons"])
+        self.assertNotIn("figure_label", all_paragraphs[2]["filter_reasons"])
+
 
 if __name__ == "__main__":
     unittest.main()
