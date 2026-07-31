@@ -3,291 +3,505 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Kokoro - Local Text to Speech</title>
+    <title>PDF Reader</title>
     <style>
-      :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f6f6fb; color: #1d1b20; }
-      main { width: min(680px, calc(100% - 32px)); box-sizing: border-box; padding: 34px; border-radius: 20px; background: #fff; box-shadow: 0 14px 45px #29125c18; }
-      h1 { margin: 0 0 6px; font-size: 1.8rem; letter-spacing: -.04em; }
-      .subtitle { margin: 0 0 26px; color: #635e68; }
-      label { display: block; margin: 0 0 8px; font-size: .9rem; font-weight: 650; }
-      textarea, input, select { width: 100%; box-sizing: border-box; border: 1px solid #d6d0db; border-radius: 11px; color: inherit; background: transparent; font: inherit; }
-      textarea { min-height: 195px; padding: 14px; line-height: 1.45; resize: vertical; }
-      textarea:focus, input:focus { outline: 3px solid #ddd4ff; border-color: #7052c9; }
-      input, select { padding: 10px; }
-      .pdf-controls, .controls { display: flex; align-items: end; gap: 12px; }
-      .pdf-controls { margin: 0 0 20px; }
-      .pdf-controls > div { min-width: 0; }
-      .pdf-controls > div:first-child { flex: 1 1 260px; }
-      .order-control, .preset-control { flex: 0 1 195px; min-width: 155px; }
-      .pdf-controls > #extract { flex: 0 0 auto; padding: 0 16px; }
-      .file-picker { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 43px; }
-      #choose-pdf { flex: 0 0 auto; }
-      #file-name { flex: 1 1 auto; min-width: 0; overflow: hidden; color: #635e68; font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
-      .controls { margin-top: 18px; }
-      .speed { width: 130px; }
-      .skip-brackets { display: flex; align-items: center; gap: 7px; min-height: 43px; margin: 0; white-space: nowrap; }
-      .skip-brackets input { width: auto; margin: 0; accent-color: #5c35b7; }
-      button { flex: 1; min-height: 43px; border: 0; border-radius: 11px; background: #5c35b7; color: white; font: inherit; font-weight: 700; cursor: pointer; }
-      button:hover { background: #49259c; }
-      button.secondary { flex: 0 0 auto; padding: 0 16px; background: #ebe5fa; color: #482889; }
-      button.secondary:hover { background: #ddd4f4; }
-      button:disabled { opacity: .58; cursor: wait; }
-      #status { min-height: 1.3em; margin: 17px 0 10px; color: #635e68; font-size: .92rem; }
-      #status.error { color: #b3261e; }
-      #pdf-status { min-height: 1.3em; margin: -12px 0 18px; color: #635e68; font-size: .85rem; }
-      audio { width: 100%; display: none; }
-      audio.ready { display: block; }
-      .footnote { margin: 22px 0 0; color: #79737d; font-size: .78rem; }
-      .library { margin-top: 24px; padding-top: 18px; border-top: 1px solid #e4dfe8; }
-      .library-header { display: flex; align-items: center; gap: 8px; }
-      .library-header h2 { flex: 1; margin: 0; font-size: 1rem; }
-      .library-header button, .library-item button { flex: 0 0 auto; min-height: 32px; padding: 0 9px; background: #ebe5fa; color: #482889; font-size: .75rem; }
-      #library-list { display: grid; gap: 8px; margin-top: 10px; }
-      .library-item { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 9px; border: 1px solid #e4dfe8; border-radius: 9px; }
-      .library-item-info { flex: 1; min-width: 0; }
-      .library-item-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .84rem; font-weight: 650; }
-      .library-item-meta { color: #79737d; font-size: .72rem; }
-      .library-empty { margin: 8px 0 0; color: #79737d; font-size: .8rem; }
+      /* ---------- Design tokens ---------- */
+      :root {
+        color-scheme: light;
+        --font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+        --bg: #f3f4f9;
+        --surface: #fff;
+        --surface-2: #f8f9fc;
+        --surface-3: #edeff6;
+        --canvas: #e4e7f0;
+        --border: #e3e6f0;
+        --border-strong: #cfd5e4;
+        --text: #14161f;
+        --text-2: #4d5364;
+        --text-3: #7a8094;
+        --accent: #5b3ad1;
+        --accent-hover: #4a2cb8;
+        --accent-soft: #ece7fb;
+        --accent-ink: #4527a8;
+        --ring: #c7b6f4;
+        --good: #1c7f55;
+        --good-soft: #dcf0e6;
+        --warn: #96660f;
+        --warn-soft: #fbeed6;
+        --danger: #b3261e;
+        --danger-soft: #fbe4e2;
+        --shadow-sm: 0 1px 2px #10182812;
+        --shadow-md: 0 6px 18px #10182814;
+        --shadow-lg: 0 24px 60px #0d132b3d;
+        --r-sm: 8px;
+        --r-md: 12px;
+        --r-lg: 18px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --bg: #0e1015;
+          --surface: #171a22;
+          --surface-2: #1c2029;
+          --surface-3: #262b36;
+          --canvas: #0a0c10;
+          --border: #272c38;
+          --border-strong: #363d4d;
+          --text: #edeff5;
+          --text-2: #b0b7c8;
+          --text-3: #838a9d;
+          --accent: #8163f5;
+          --accent-hover: #9179ff;
+          --accent-soft: #241d3f;
+          --accent-ink: #c4b3ff;
+          --ring: #4b3a8f;
+          --good: #5fd3a0;
+          --good-soft: #16302690;
+          --warn: #e0b063;
+          --warn-soft: #33280f90;
+          --danger: #ff8a80;
+          --danger-soft: #3a1c1a;
+          --shadow-sm: 0 1px 2px #0006;
+          --shadow-md: 0 6px 18px #0007;
+          --shadow-lg: 0 24px 60px #000a;
+        }
+      }
 
-      #reader { position: fixed; inset: 0; z-index: 10; display: grid; grid-template-rows: auto minmax(0, 1fr); background: #17131d; color: #f5eff8; }
-      #reader[hidden] { display: none !important; }
-      .reader-header { display: flex; align-items: center; gap: 16px; min-height: 64px; padding: 0 20px; background: #251d30; }
-      .reader-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
-      #reader-close { flex: 0 0 auto; min-height: 38px; padding: 0 14px; background: #47365b; }
-      #reader-help { flex: 0 0 auto; min-height: 38px; padding: 0 14px; background: #47365b; }
-      .reader-body { min-height: 0; display: grid; grid-template-columns: minmax(0, 2fr) minmax(310px, 1fr); }
-      #pdf-viewer { overflow: auto; padding: 24px; background: #3b3343; }
-      .pdf-loading { margin: 0; color: #ddd3e4; text-align: center; }
-      .pdf-page { position: relative; width: max-content; margin: 0 auto 24px; box-shadow: 0 4px 22px #0007; }
-      .pdf-page canvas { display: block; }
-      .pdf-paragraph { position: absolute; min-height: 0; border: 1px solid transparent; border-radius: 3px; background: #0000; cursor: pointer; }
-      .pdf-paragraph:hover { border-color: #a78bf0; background: #a78bf014; }
-      .pdf-paragraph.status-converting { border-color: #d6a833; border-style: dashed; background: #ffba871f; }
-      .pdf-paragraph.status-ready, .pdf-paragraph.status-played { border-color: #6caa8588; background: #00ff3814; }
-      .pdf-paragraph.status-playing { border-color: transparent; background: #0010ff14; }
-      .pdf-paragraph.status-playing::before { content: ''; position: absolute; top: -6px; bottom: -6px; left: -13px; width: 5px; border-radius: 999px; background: #6544b8; box-shadow: 0 1px 5px #6544b899; pointer-events: none; }
-      .pdf-paragraph.status-playing::after { content: ''; position: absolute; inset: -5px; border: 2px solid #6544b8; border-radius: 7px; box-shadow: 0 0 0 4px #6544b820; pointer-events: none; }
-      .pdf-paragraph.annotated { box-shadow: inset 4px 0 0 #e3a400; }
-      .pdf-paragraph.search-filtered { opacity: .14; pointer-events: none; }
-      .reader-panel { min-height: 0; display: flex; flex-direction: column; border-left: 1px solid #4d405a; background: #201827; }
-      #reader.listen-only .reader-body { grid-template-columns: 1fr; }
-      #reader.listen-only #pdf-viewer, #reader.listen-only #transcript, #reader.listen-only .reader-search, #reader.listen-only #reader-drawer { display: none; }
-      #reader.listen-only .reader-panel { border-left: 0; align-items: center; justify-content: center; }
-      #reader.listen-only .reader-controls, #reader.listen-only .reader-actions { width: min(680px, 100%); box-sizing: border-box; }
-      .reader-controls { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid #4d405a; }
-      #reader-toggle { flex: 0 0 auto; min-width: 86px; }
-      #reader-progress { color: #cfc2d8; font-size: .86rem; }
-      .pdf-zoom { display: flex; align-items: center; gap: 4px; }
-      .pdf-zoom button { flex: 0 0 34px; min-height: 32px; padding: 0; background: #47365b; }
-      #pdf-zoom-value { min-width: 46px; color: #ddd3e4; font-size: .78rem; text-align: center; }
-      .reader-rate { display: grid; gap: 2px; margin-left: auto; color: #cfc2d8; font-size: .72rem; }
-      #reader-playback-speed { width: 110px; padding: 0; accent-color: #9d7be5; }
-      #reader-playback-value { color: #fff; font-size: .8rem; font-variant-numeric: tabular-nums; }
-      .reader-actions, .reader-search { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #4d405a; }
-      .reader-actions button, .reader-search button { flex: 0 0 auto; min-height: 32px; padding: 0 9px; background: #47365b; font-size: .78rem; }
-      .reader-search input { min-width: 0; padding: 7px 9px; font-size: .82rem; }
-      #reader-search-count { min-width: 3.5em; color: #bdb0c7; font-size: .75rem; text-align: right; }
-      #reader-drawer { overflow: auto; max-height: 32%; padding: 10px 16px; border-bottom: 1px solid #4d405a; background: #19141f; }
-      #reader-drawer[hidden] { display: none; }
-      #reader-drawer h3 { margin: 0 0 8px; font-size: .86rem; color: #e6dced; }
-      #reader-drawer p { margin: 0; color: #bdb0c7; font-size: .8rem; }
-      button.drawer-item { display: block; width: 100%; min-height: 0; margin: 0 0 6px; padding: 7px 8px; border-radius: 6px; background: transparent; color: #ddd3e4; font-size: .82rem; font-weight: 500; text-align: left; }
-      button.drawer-item:hover { background: #342a40; }
-      button.drawer-item .drawer-meta { display: block; margin-top: 2px; color: #bba6d2; font-size: .7rem; }
-      mark { padding: 0 1px; border-radius: 2px; background: #f4c95d; color: #211b11; }
-      #reader-status { min-height: 1.2em; margin: 0; padding: 10px 16px; color: #bdb0c7; font-size: .84rem; }
-      #transcript { overflow: auto; padding: 4px 16px 28px; line-height: 1.55; }
-      button.chunk { display: block; width: 100%; min-height: 0; margin: 0 0 14px; padding: 9px 10px; border-radius: 8px; background: transparent; color: #cfc5d6; font-weight: 400; text-align: left; transition: background .18s, color .18s; }
-      button.chunk:hover { background: #342a40; }
-      .chunk.active { background: #7251be; color: #fff; box-shadow: 0 0 0 1px #a88cf0 inset; }
-      .chunk-meta { display: block; margin-bottom: 3px; color: #bba6d2; font-size: .72rem; font-weight: 700; }
-      .chunk.active .chunk-meta { color: #eee8ff; }
-      .status-converting .chunk-meta { color: #f5c776; }
-      .status-ready .chunk-meta, .status-played .chunk-meta { color: #8fdbb0; }
-      .status-error .chunk-meta { color: #ffaaa4; }
-      #reader-help-dialog { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 24px; background: #0009; }
-      #reader-help-dialog[hidden] { display: none; }
-      .shortcut-card { width: min(430px, 100%); padding: 24px; border-radius: 14px; background: #2b2136; box-shadow: 0 18px 44px #0008; }
-      .shortcut-card h2 { margin: 0 0 12px; font-size: 1.15rem; }
-      .shortcut-card dl { display: grid; grid-template-columns: auto 1fr; gap: 9px 15px; margin: 0 0 20px; color: #e1d7e8; }
-      .shortcut-card dt { color: #bfa6e5; font-weight: 700; }
-      .shortcut-card dd { margin: 0; }
-      /* Gallery-first application shell. */
-      body { display: block; background: #f2f4f8; }
-      main { width: min(1240px, calc(100% - 40px)); min-height: 100vh; margin: 0 auto; padding: 32px 0 52px; border-radius: 0; background: transparent; box-shadow: none; }
-      .home-header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
-      .home-header h1 { font-size: 2rem; }
-      .home-header .subtitle { flex: 1; margin: 4px 0 0; }
-      .home-header button { flex: 0 0 auto; padding: 0 18px; }
-      .gallery-layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 24px; align-items: start; }
-      .gallery-panel, .setup-panel { padding: 22px; border: 1px solid #e1e4eb; border-radius: 16px; background: #fff; box-shadow: 0 8px 24px #19233b0a; }
-      .gallery-panel h2, .setup-panel h2 { margin: 0 0 4px; font-size: 1.1rem; }
-      .panel-note { margin: 0 0 18px; color: #6b7280; font-size: .86rem; }
-      #library-list { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin: 0; }
-      .library-item { position: relative; display: block; min-height: 148px; padding: 16px; border-color: #e3e6ee; border-radius: 13px; background: linear-gradient(145deg,#fff,#f7f8fb); }
-      .library-item::before { content: 'PDF'; display: grid; place-items: center; width: 38px; height: 48px; margin-bottom: 13px; border-radius: 5px; background: #e8edff; color: #3954a5; font-size: .65rem; font-weight: 800; letter-spacing: .08em; }
-      .library-item-name { font-size: .92rem; }
-      .library-item-meta { margin-top: 5px; line-height: 1.45; }
-      .library-item-actions { display: flex; gap: 6px; margin-top: 14px; }
-      .library-item-actions button { min-height: 30px; padding: 0 9px; border-radius: 7px; }
-      .setup-panel { position: fixed; z-index: 30; top: 50%; left: 50%; width: min(390px, calc(100vw - 40px)); transform: translate(-50%, -50%); box-shadow: 0 22px 60px #15192744; }
-      .setup-panel::before { content: ''; position: fixed; z-index: -1; inset: -100vmax; background: #17203355; }
-      .setup-panel[hidden] { display: none; }
-      .setup-panel .pdf-controls { display: grid; grid-template-columns: 1fr; gap: 13px; margin: 18px 0 0; }
-      .setup-panel .pdf-controls > div, .setup-panel .order-control, .setup-panel .preset-control { min-width: 0; }
-      .setup-panel #extract { width: 100%; }
-      .quick-tools { display: flex; gap: 8px; margin-top: 14px; }
-      .quick-tools button { min-height: 36px; font-size: .8rem; }
-      .legacy-tts { display: none; }
-      .library { margin: 22px 0 0; padding: 0; border: 0; }
-      .library-header, #collection-list, .footnote { display: none; }
-      .reader-body { grid-template-columns: minmax(0, 1fr) 350px; }
-      .reader-panel { background: #201827; }
-      .reader-controls { flex-wrap: wrap; gap: 9px; padding: 12px 14px; }
-      #reader-progress { order: 5; flex: 1 0 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .reader-actions { padding: 0 14px; gap: 0; }
-      .reader-actions button { flex: 1; min-height: 42px; border-radius: 0; background: transparent; color: #bdb0c7; font-size: .74rem; }
-      .reader-actions button.active { color: #fff; box-shadow: inset 0 -2px #a88cf0; }
-      .reader-actions button[data-secondary] { display: none; }
-      .reader-search { padding: 12px 14px; }
-      #reader-drawer { display: block; flex: 1; max-height: none; padding: 12px 14px 24px; border: 0; background: transparent; }
-      #reader-drawer[hidden] { display: block; }
-      #reader-status { padding: 0 14px 10px; }
-      #transcript { display: none; }
-      .pdf-paragraph { overflow: visible; }
-      .paragraph-tools { position: absolute; z-index: 3; right: 0; bottom: calc(100% - 4px); display: flex; gap: 3px; padding: 3px; border-radius: 8px; background: #251d30e8; box-shadow: 0 4px 15px #0006; opacity: 0; transition: opacity .15s; pointer-events: none; }
+      /* ---------- Base ---------- */
+      * { box-sizing: border-box; }
+      /* Component display rules must never win over the hidden attribute. */
+      [hidden] { display: none !important; }
+      body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--font); font-size: .875rem; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+      h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -.015em; }
+      h1 { font-size: 1.6rem; letter-spacing: -.03em; }
+      h2 { font-size: 1.0625rem; }
+      h3 { font-size: .9rem; }
+      p { margin: 0; }
+      svg { flex: 0 0 auto; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+      .muted { color: var(--text-3); }
+      .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+      /* ---------- Controls ---------- */
+      button { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+      button:disabled { cursor: not-allowed; opacity: .45; }
+      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 0 14px; border: 1px solid transparent; border-radius: var(--r-sm); font-size: .82rem; font-weight: 600; white-space: nowrap; transition: background .14s, border-color .14s, color .14s; }
+      .btn svg { width: 16px; height: 16px; }
+      .btn-primary { background: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
+      .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+      .btn-ghost { border-color: var(--border); background: var(--surface); color: var(--text-2); }
+      .btn-ghost:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
+      .btn-quiet { color: var(--text-2); }
+      .btn-quiet:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
+      .btn-danger { color: var(--danger); }
+      .btn-danger:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
+      .btn-sm { min-height: 30px; padding: 0 10px; font-size: .78rem; }
+      .icon-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: var(--r-sm); color: var(--text-2); transition: background .14s, color .14s; }
+      .icon-btn:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
+      label { display: block; margin-bottom: 6px; color: var(--text-2); font-size: .78rem; font-weight: 650; }
+      input, select, textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface); color: var(--text); font: inherit; font-size: .84rem; }
+      input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+      textarea { min-height: 92px; resize: vertical; }
+      .field + .field { margin-top: 16px; }
+      .field-hint { margin-top: 6px; color: var(--text-3); font-size: .76rem; }
+      .check { display: flex; align-items: center; gap: 9px; margin: 0; color: var(--text); font-size: .82rem; font-weight: 500; cursor: pointer; }
+      .check input { width: 16px; height: 16px; padding: 0; accent-color: var(--accent); }
+      .progress { height: 4px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+      .progress > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .3s; }
+
+      /* ---------- Home ---------- */
+      .home { width: min(1180px, 100% - 48px); margin: 0 auto; padding: 40px 0 64px; }
+      .home-header { display: flex; align-items: center; gap: 16px; margin-bottom: 26px; }
+      .home-header > div { flex: 1; min-width: 0; }
+      .subtitle { margin-top: 3px; color: var(--text-3); font-size: .86rem; }
+      .panel { padding: 20px 22px 24px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+      .panel-head { display: flex; align-items: center; gap: 10px; padding-bottom: 16px; }
+      .panel-head h2 { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+      .count { padding: 1px 8px; border-radius: 999px; background: var(--surface-3); color: var(--text-3); font-size: .72rem; font-weight: 700; }
+      .chips { display: flex; flex-wrap: wrap; gap: 7px; padding-bottom: 18px; }
+      .chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 13px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-2); font-size: .78rem; font-weight: 600; transition: background .14s, color .14s, border-color .14s; }
+      .chip:hover { background: var(--surface-3); color: var(--text); }
+      .chip[aria-pressed="true"] { border-color: transparent; background: var(--accent-soft); color: var(--accent-ink); }
+      .chip-add { border-style: dashed; color: var(--text-3); }
+      .chip svg { width: 14px; height: 14px; }
+
+      .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); gap: 18px; }
+      .doc { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); overflow: hidden; transition: border-color .14s, box-shadow .14s, transform .14s; }
+      .doc:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+      .doc-cover { display: block; width: 100%; aspect-ratio: 3 / 4; border-bottom: 1px solid var(--border); background: var(--surface-3); overflow: hidden; }
+      .doc-cover img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; background: #fff; }
+      .doc-cover-blank { display: grid; place-items: center; width: 100%; height: 100%; color: var(--text-3); }
+      .doc-cover-blank svg { width: 30px; height: 30px; }
+      .doc-body { flex: 1; padding: 13px 14px 4px; }
+      .doc-name { margin-bottom: 3px; }
+      .doc-meta { color: var(--text-3); font-size: .74rem; }
+      .doc-progress { display: flex; align-items: center; gap: 8px; margin-top: 11px; color: var(--text-3); font-size: .72rem; font-weight: 600; }
+      .doc-progress .progress { flex: 1; }
+      .doc-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+      .tag { padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: .68rem; font-weight: 700; }
+      .doc-actions { display: flex; align-items: center; gap: 4px; padding: 11px 12px 12px; }
+      .doc-actions .btn { flex: 1; }
+      .doc-badge { display: inline-flex; align-items: center; gap: 5px; }
+      .doc-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
+      .doc-badge.pending::before { background: var(--warn); }
+
+      .empty { grid-column: 1 / -1; display: grid; justify-items: center; gap: 10px; padding: 44px 20px; border: 1px dashed var(--border-strong); border-radius: var(--r-md); color: var(--text-3); text-align: center; }
+      .empty svg { width: 30px; height: 30px; }
+      .empty p { max-width: 34ch; font-size: .82rem; }
+      .collection-row { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
+      .collection-row > div { flex: 1; min-width: 0; }
+      .collection-row .name { font-size: .82rem; font-weight: 650; }
+      .collection-row .meta { color: var(--text-3); font-size: .72rem; }
+
+      /* ---------- Modals ---------- */
+      .modal { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 24px; background: #0b0f1e7a; backdrop-filter: blur(2px); }
+      .modal-card { width: min(430px, 100%); max-height: calc(100vh - 48px); display: flex; flex-direction: column; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-lg); overflow: hidden; }
+      .modal-head { display: flex; align-items: center; gap: 12px; padding: 18px 18px 0; }
+      .modal-head > div { flex: 1; min-width: 0; }
+      .kicker { display: block; margin-bottom: 2px; color: var(--accent); font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+      .modal-body { overflow: auto; padding: 16px 18px 4px; }
+      .modal-foot { display: flex; justify-content: end; gap: 8px; padding: 16px 18px 18px; }
+      .file-row { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; padding: 10px 11px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
+      .file-badge { flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 38px; border-radius: 5px; background: var(--accent-soft); color: var(--accent-ink); font-size: .58rem; font-weight: 800; letter-spacing: .06em; }
+      .file-row span#file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .82rem; font-weight: 600; }
+      .disclosure { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+      .disclosure summary { display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: .78rem; font-weight: 650; cursor: pointer; list-style: none; }
+      .disclosure summary::-webkit-details-marker { display: none; }
+      .disclosure summary::before { content: '▸'; transition: transform .15s; }
+      .disclosure[open] summary::before { transform: rotate(90deg); }
+      .disclosure > *:not(summary) { margin-top: 14px; }
+      .status { min-height: 1.25em; margin-top: 14px; color: var(--text-3); font-size: .78rem; }
+      .status.error { color: var(--danger); }
+
+      /* ---------- Reader ---------- */
+      #reader { position: fixed; z-index: 20; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--bg); color: var(--text); }
+      .reader-top { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
+      .reader-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; font-weight: 700; }
+      .reader-body { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 372px; }
+      .pdf-pane { position: relative; min-width: 0; background: var(--canvas); }
+      #pdf-viewer { position: absolute; inset: 0; overflow: auto; padding: 26px 26px 76px; }
+      .pdf-loading { margin-top: 40px; color: var(--text-3); text-align: center; }
+      .pdf-page { position: relative; width: max-content; margin: 0 auto 22px; border-radius: 3px; background: #fff; box-shadow: 0 1px 2px #0000002e, 0 10px 26px #00000024; }
+      .pdf-page canvas { display: block; border-radius: inherit; }
+      .zoom-float { position: absolute; z-index: 2; right: 20px; bottom: 20px; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow-md); }
+      .zoom-float .icon-btn { width: 30px; height: 30px; border-radius: 999px; }
+      #pdf-zoom-value { min-width: 46px; color: var(--text-2); font-size: .74rem; font-weight: 650; font-variant-numeric: tabular-nums; text-align: center; }
+
+      .reader-panel { min-height: 0; display: flex; flex-direction: column; border-left: 1px solid var(--border); background: var(--surface); }
+      .player { padding: 16px 16px 14px; border-bottom: 1px solid var(--border); }
+      .transport { display: flex; align-items: center; gap: 10px; }
+      .play-btn { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: var(--accent); color: #fff; box-shadow: var(--shadow-sm); transition: background .14s; }
+      .play-btn:hover:not(:disabled) { background: var(--accent-hover); }
+      .play-btn svg { width: 20px; height: 20px; fill: currentColor; stroke: none; }
+      .transport-meta { flex: 1; min-width: 0; }
+      #reader-progress { display: block; overflow: hidden; font-size: .82rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+      .transport-sub { display: block; overflow: hidden; color: var(--text-3); font-size: .73rem; text-overflow: ellipsis; white-space: nowrap; }
+      .player-track { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+      .player-track .progress { flex: 1; }
+      .speed { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; margin: 0; }
+      .speed input { width: 84px; padding: 0; border: 0; background: none; accent-color: var(--accent); }
+      .speed input:focus { box-shadow: none; }
+      #reader-playback-value { min-width: 2.6em; color: var(--text-2); font-size: .72rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+      #reader-status { min-height: 1.2em; margin-top: 9px; color: var(--text-3); font-size: .75rem; }
+
+      .tabs { display: flex; gap: 2px; padding: 10px 12px 0; }
+      .tabs button { flex: 1; min-height: 34px; border-radius: var(--r-sm) var(--r-sm) 0 0; color: var(--text-3); font-size: .8rem; font-weight: 650; }
+      .tabs button:hover:not(:disabled) { color: var(--text); }
+      .tabs button.active { color: var(--accent-ink); box-shadow: inset 0 -2px var(--accent); }
+      .reader-search { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+      .search-field { flex: 1; position: relative; display: flex; align-items: center; }
+      .search-field svg { position: absolute; left: 10px; width: 15px; height: 15px; color: var(--text-3); pointer-events: none; }
+      .search-field input { padding: 7px 10px 7px 32px; font-size: .8rem; }
+      #reader-search-count { min-width: 4.2em; color: var(--text-3); font-size: .72rem; text-align: right; }
+      .reader-search .icon-btn { width: 30px; height: 30px; }
+
+      #reader-drawer { flex: 1; min-height: 0; overflow: auto; padding: 10px 10px 18px; }
+      #reader-drawer h3 { padding: 4px 4px 8px; color: var(--text-3); font-size: .7rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+      #reader-drawer > p { padding: 6px 4px; color: var(--text-3); font-size: .8rem; }
+      .drawer-item { display: block; width: 100%; margin-bottom: 3px; padding: 9px 10px; border-radius: var(--r-sm); color: var(--text-2); font-size: .82rem; line-height: 1.45; text-align: left; transition: background .12s, color .12s; }
+      .drawer-item:hover { background: var(--surface-3); color: var(--text); }
+      .drawer-item.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+      .drawer-meta { display: block; margin-top: 3px; color: var(--text-3); font-size: .69rem; font-weight: 600; letter-spacing: .01em; }
+      .drawer-item.active .drawer-meta { color: var(--accent-ink); opacity: .8; }
+
+      /* A saved passage reads as a quotation with the note answering it. */
+      .passage { padding: 10px 11px 9px; border: 1px solid var(--border); background: var(--surface-2); }
+      .passage:hover { border-color: var(--border-strong); background: var(--surface-3); }
+      .passage-quote { display: -webkit-box; overflow: hidden; padding-left: 10px; border-left: 3px solid #e0a021; color: var(--text-3); font-size: .77rem; font-style: italic; line-height: 1.45; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+      .passage-note { display: block; margin-top: 8px; color: var(--text); font-size: .82rem; font-weight: 500; line-height: 1.5; white-space: pre-wrap; }
+      .passage.has-note .drawer-meta { margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--border); }
+      mark { padding: 0 2px; border-radius: 3px; background: #f6d365; color: #241c05; }
+
+      .reader-tools { display: flex; align-items: center; gap: 6px; padding: 11px 14px; border-top: 1px solid var(--border); background: var(--surface-2); }
+      .reader-tools .btn { flex: 1; }
+      .menu { position: relative; flex: 1; }
+      .menu > summary { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text-2); font-size: .82rem; font-weight: 600; cursor: pointer; list-style: none; }
+      .menu > summary::-webkit-details-marker { display: none; }
+      .menu > summary:hover { background: var(--surface-3); color: var(--text); }
+      .menu-list { position: absolute; z-index: 3; right: 0; bottom: calc(100% + 6px); min-width: 190px; padding: 5px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow-lg); }
+      .menu-list button { display: block; width: 100%; padding: 8px 10px; border-radius: 6px; color: var(--text-2); font-size: .8rem; font-weight: 600; text-align: left; }
+      .menu-list button:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
+
+      /* PDF paragraph overlays */
+      .pdf-paragraph { position: absolute; border: 1px solid transparent; border-radius: 3px; cursor: pointer; overflow: visible; transition: background .15s, border-color .15s; }
+      .pdf-paragraph:hover { border-color: var(--accent); background: #5b3ad114; }
+      .pdf-paragraph.status-converting { border-color: #d6a83399; border-style: dashed; background: #ffba871f; }
+      .pdf-paragraph.status-ready, .pdf-paragraph.status-played { border-color: #4aa77e5c; background: #17b87d12; }
+      .pdf-paragraph.status-playing { border-color: transparent; background: #5b3ad11a; box-shadow: 0 0 0 2px var(--accent), 0 0 0 6px #5b3ad11f; }
+      .pdf-paragraph.status-playing::before { content: ''; position: absolute; top: -5px; bottom: -5px; left: -12px; width: 4px; border-radius: 999px; background: var(--accent); }
+      /* Both markers sit in the margin: nothing may be painted over the page. */
+      .pdf-paragraph.annotated::after { content: ''; position: absolute; top: -1px; bottom: -1px; right: -11px; width: 3px; border-radius: 999px; background: #e0a021; pointer-events: none; }
+      .pdf-paragraph.search-match { outline: 2px solid #f0b429; outline-offset: 1px; }
+      /* The tools sit above the paragraph, over the note card's reserved
+         bottom-right band, so they must paint above it. */
+      .paragraph-tools { position: absolute; z-index: 5; right: 0; bottom: calc(100% - 3px); display: flex; gap: 3px; padding: 3px; border-radius: var(--r-sm); background: #333c52f2; box-shadow: 0 3px 10px #0f172a4d; opacity: 0; transition: opacity .14s; pointer-events: none; }
       .pdf-paragraph:hover .paragraph-tools, .pdf-paragraph:focus-within .paragraph-tools { opacity: 1; pointer-events: auto; }
-      .paragraph-tools button { min-height: 25px; min-width: 25px; padding: 0 6px; border-radius: 5px; background: #47365b; color: #fff; font-size: .74rem; }
-      #entry-dialog { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 24px; background: #0008; }
-      #entry-dialog[hidden] { display: none; }
-      .entry-card { width: min(410px, 100%); padding: 22px; border-radius: 14px; background: #fff; color: #1d1b20; box-shadow: 0 18px 44px #0008; }
-      .entry-card h2 { margin: 0 0 8px; font-size: 1.1rem; }
-      .entry-card p { margin: 0 0 16px; color: #635e68; font-size: .88rem; }
-      .entry-card textarea, .entry-card input { margin-bottom: 12px; min-height: 0; }
-      .entry-card .dialog-actions { display: flex; justify-content: end; gap: 8px; }
-      .entry-card .dialog-actions button { flex: 0 0 auto; min-height: 36px; padding: 0 13px; }
-      @media (max-width: 820px) { main { width: min(100% - 24px, 1240px); } .gallery-layout { grid-template-columns: 1fr; } .setup-panel { position: static; } .reader-body { grid-template-columns: 1fr; } }
-      @media (max-width: 760px) { .pdf-controls { flex-wrap: wrap; } .pdf-controls > div:first-child { flex-basis: 100%; } .reader-body { grid-template-columns: 1fr; grid-template-rows: minmax(45vh, 1fr) minmax(35vh, 1fr); } .reader-panel { border-left: 0; border-top: 1px solid #4d405a; } }
-      @media (prefers-color-scheme: dark) { body { background: #16131b; color: #eae4ee; } main { background: #24202a; box-shadow: none; } .subtitle, #status { color: #cfc5d2; } textarea, input { border-color: #625b67; } button.secondary { background: #453561; color: #eee6fb; } }
+      .paragraph-tools button { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; color: #e7e9f2; transition: background .12s, color .12s; }
+      .paragraph-tools button:hover { background: #ffffff26; }
+      .paragraph-tools svg { width: 14px; height: 14px; }
+      /* A filled icon means the action is already applied to this paragraph. */
+      .paragraph-tools button.is-on { color: #f6c945; }
+      .paragraph-tools button.is-on svg { fill: currentColor; }
+      /* The note spans the paragraph it belongs to and sits directly above it.
+         The deep bottom padding is the band the action tools overlap, so note
+         text is never hidden behind them. */
+      .paragraph-note { position: absolute; z-index: 4; bottom: calc(100% + 10px); left: 0; right: 0; display: flex; gap: 10px; padding: 13px 15px 27px; border-left: 3px solid #e0a021; border-radius: 5px var(--r-md) var(--r-md) 5px; background: #1b1f2cf7; color: #f2f4f9; font: inherit; font-size: 1rem; line-height: 1.55; text-align: left; box-shadow: 0 8px 24px #0f172a33; opacity: 0; transform: translateY(4px); transition: opacity .14s, transform .14s; pointer-events: none; cursor: pointer; }
+      .paragraph-note:hover { background: #242a3af7; }
+      /* An invisible strip carries the pointer across the gap to the note, so
+         the group stays hovered without painting anything into it. */
+      .paragraph-note::after { content: ''; position: absolute; top: 100%; left: 0; right: 0; height: 12px; }
+      .paragraph-note svg { width: 17px; height: 17px; margin-top: 3px; color: #f6c945; }
+      .paragraph-note-text { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 6; -webkit-box-orient: vertical; white-space: pre-wrap; }
+      .pdf-paragraph:hover .paragraph-note, .pdf-paragraph:focus-within .paragraph-note { opacity: 1; transform: none; pointer-events: auto; }
+      .btn.is-on { border-color: #e0a02166; background: #f6c94520; color: #a4740c; }
+      .btn.is-on svg { fill: currentColor; }
+      @media (prefers-color-scheme: dark) { .btn.is-on { color: #f6c945; } }
+
+      /* Listen-only */
+      #reader.listen-only .reader-body { grid-template-columns: 1fr; }
+      #reader.listen-only .pdf-pane, #reader.listen-only .tabs, #reader.listen-only .reader-search, #reader.listen-only #reader-drawer { display: none; }
+      #reader.listen-only .reader-panel { border-left: 0; align-items: center; justify-content: center; background: var(--bg); }
+      #reader.listen-only .player, #reader.listen-only .reader-tools { width: min(560px, 100%); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
+      #reader.listen-only .reader-tools { margin-top: 12px; }
+
+      /* Shortcuts */
+      .shortcut-list { display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; align-items: center; }
+      .shortcut-list dt { display: flex; gap: 5px; }
+      .shortcut-list dd { margin: 0; color: var(--text-2); font-size: .82rem; }
+      kbd { min-width: 24px; padding: 2px 7px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 6px; background: var(--surface-2); color: var(--text-2); font-family: var(--font); font-size: .72rem; font-weight: 700; text-align: center; }
+
+      @media (max-width: 980px) {
+        .reader-body { grid-template-columns: 1fr; grid-template-rows: minmax(42vh, 1fr) minmax(38vh, 1fr); }
+        .reader-panel { border-left: 0; border-top: 1px solid var(--border); }
+      }
+      @media (max-width: 720px) {
+        .home { width: calc(100% - 28px); padding-top: 26px; }
+        .panel { padding: 16px; }
+        .card-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+      }
     </style>
   </head>
   <body>
-    <main>
+    <svg hidden aria-hidden="true">
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5h2.5v14H9zm5.5 0H17v14h-2.5z"/></symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 6v12L9 12zM6 5v14"/></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 6v12l9-6zM18 5v14"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 12h10l1-12"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+      <symbol id="i-mark" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></symbol>
+      <symbol id="i-note" viewBox="0 0 24 24"><path d="M4 20v-3.5L16 4.6a1.8 1.8 0 0 1 2.6 0l.9.9a1.8 1.8 0 0 1 0 2.6L7.5 20z"/></symbol>
+      <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><path d="M4 15h3v5H5.5A1.5 1.5 0 0 1 4 18.5zm16 0h-3v5h1.5a1.5 1.5 0 0 0 1.5-1.5z"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zm0 0v5h5"/></symbol>
+      <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.7 9.5a2.4 2.4 0 1 1 2.8 2.7v1.3"/><path d="M12.5 16.7h.01"/></symbol>
+      <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V6m0 0-5 5m5-5 5 5"/></symbol>
+      <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v13m0 0 5-5m-5 5-5-5"/></symbol>
+    </svg>
+
+    <main class="home">
       <header class="home-header">
-        <div><h1>PDF Reader</h1><p class="subtitle">Your local reading desk</p></div>
-        <button id="choose-pdf" type="button">Add PDF</button>
+        <div>
+          <h1>PDF Reader</h1>
+          <p class="subtitle">Your local reading desk — nothing leaves this computer.</p>
+        </div>
+        <button id="choose-pdf" class="btn btn-primary" type="button"><svg><use href="#i-plus"/></svg>Add PDF</button>
         <input id="pdf" type="file" accept="application/pdf,.pdf" hidden>
       </header>
-      <div class="gallery-layout">
-        <section class="gallery-panel" aria-labelledby="library-title">
-          <h2 id="library-title">Your PDFs</h2>
-          <p class="panel-note">Extracted text, reading position, bookmarks, highlights, and notes stay with each document on this Mac.</p>
-          <div id="library-list"><p class="library-empty">Add a PDF to start your local library.</p></div>
-          <div id="collection-list"></div>
-        </section>
-        <section class="setup-panel" id="document-setup" hidden role="dialog" aria-modal="true" aria-labelledby="setup-title">
-          <span class="import-kicker">Import PDF</span>
-          <h2 id="setup-title">Add to your library</h2>
-          <div class="import-file"><span class="import-file-icon">PDF</span><span id="file-name">Choose a PDF</span></div>
-          <p class="panel-note">This saves the PDF, creates its first-page preview, and extracts text once.</p>
-          <div class="pdf-controls">
-            <div class="preset-control"><label for="extraction-preset">What should be read aloud?</label><select id="extraction-preset"><option value="prose" selected>Prose only - recommended</option><option value="prose_captions">Prose and captions</option><option value="full">Everything Docling finds</option></select></div>
-            <details class="import-advanced"><summary>Advanced extraction</summary><div class="order-control"><label for="reading-order">Extraction engine</label><select id="reading-order"><option value="docling" selected>Docling text-only</option><option value="docling_no_ocr">Docling text-only (no OCR)</option><option value="source">Preserve source paragraphs</option><option value="columns">Column-aware layout</option></select></div></details>
-          </div>
-          <div class="quick-tools"><button id="import-cancel" class="secondary" type="button">Cancel</button><button id="extract" type="button" disabled>Add and open</button></div>
-          <p id="pdf-status">Choose a document to prepare it for reading.</p>
-        </section>
-      </div>
-      <div class="legacy-tts"><textarea id="text"></textarea><input id="speed" value="1"><input id="skip-bracketed-text" type="checkbox"><button id="convert"></button><button id="read-document"></button><audio id="player"></audio><p id="status"></p><button id="new-collection"></button><button id="keep-offline"></button><button id="clear-library"></button></div>
+
+      <section class="panel" aria-labelledby="library-title">
+        <div class="panel-head">
+          <h2 id="library-title">Your PDFs <span id="library-count" class="count" hidden>0</span></h2>
+          <button id="new-collection" class="btn btn-quiet btn-sm" type="button"><svg><use href="#i-folder"/></svg>New collection</button>
+          <button id="clear-library" class="btn btn-quiet btn-danger btn-sm" type="button">Clear library</button>
+        </div>
+        <div id="collection-list" class="chips"></div>
+        <div id="library-list" class="card-grid">
+          <div class="empty"><svg><use href="#i-file"/></svg><p>Add a PDF to start your local library. Text, position, highlights, and notes stay in this browser.</p></div>
+        </div>
+      </section>
     </main>
 
+    <div class="modal" id="document-setup" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+        <div class="modal-head">
+          <div><span class="kicker">Import PDF</span><h2 id="setup-title">Add to your library</h2></div>
+          <button id="import-close" class="icon-btn" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+        </div>
+        <div class="modal-body">
+          <div class="file-row">
+            <span class="file-badge">PDF</span>
+            <span id="file-name">Choose a PDF</span>
+            <button id="import-choose" class="btn btn-ghost btn-sm" type="button">Choose file</button>
+          </div>
+          <div class="field">
+            <label for="extraction-preset">What should be read aloud?</label>
+            <select id="extraction-preset">
+              <option value="prose" selected>Prose only — recommended</option>
+              <option value="prose_captions">Prose and captions</option>
+              <option value="full">Everything Docling finds</option>
+            </select>
+            <p class="field-hint">Importing stores the PDF, renders a preview, and extracts text once.</p>
+          </div>
+          <details class="disclosure">
+            <summary>Advanced extraction</summary>
+            <div class="field">
+              <label for="reading-order">Extraction engine</label>
+              <select id="reading-order">
+                <option value="docling" selected>Docling text-only</option>
+                <option value="docling_no_ocr">Docling text-only (no OCR)</option>
+                <option value="source">Preserve source paragraphs</option>
+                <option value="columns">Column-aware layout</option>
+              </select>
+            </div>
+            <label class="check" for="skip-bracketed-text"><input id="skip-bracketed-text" type="checkbox">Skip [bracketed text] when speaking</label>
+          </details>
+          <p id="pdf-status" class="status">Choose a document to prepare it for reading.</p>
+        </div>
+        <div class="modal-foot">
+          <button id="import-cancel" class="btn btn-ghost" type="button">Cancel</button>
+          <button id="extract" class="btn btn-primary" type="button" disabled>Add and open</button>
+        </div>
+      </div>
+    </div>
+
     <section id="reader" hidden aria-label="PDF reader">
-      <header class="reader-header">
+      <header class="reader-top">
+        <button id="reader-close" class="btn btn-quiet" type="button"><svg><use href="#i-back"/></svg>Library</button>
         <span id="reader-title" class="reader-title">PDF reader</span>
-        <button id="reader-help" type="button" aria-keyshortcuts="?">Shortcuts</button>
-        <button id="reader-close" type="button">Exit reader</button>
+        <button id="reader-listen-only" class="btn btn-ghost btn-sm" type="button" disabled>Listen only</button>
+        <button id="reader-help" class="icon-btn" type="button" aria-label="Keyboard shortcuts" aria-keyshortcuts="?"><svg><use href="#i-help"/></svg></button>
       </header>
       <div class="reader-body">
-        <div id="pdf-viewer" aria-label="Selected PDF"><p class="pdf-loading">The PDF will render here when reading begins.</p></div>
-        <aside class="reader-panel">
-          <div class="reader-controls">
-            <button id="reader-toggle" type="button" aria-keyshortcuts="Space" disabled>Pause</button>
-            <span id="reader-progress">Preparing reader...</span>
-            <div class="pdf-zoom" aria-label="PDF zoom controls" title="Use Command/Ctrl + scroll to zoom around the pointer">
-              <button id="pdf-zoom-out" type="button" title="Zoom out">-</button>
-              <output id="pdf-zoom-value">125%</output>
-              <button id="pdf-zoom-in" type="button" title="Zoom in">+</button>
-            </div>
-            <label class="reader-rate" for="reader-playback-speed">Playback speed
-              <input id="reader-playback-speed" type="range" min="0.5" max="2" step="0.1" value="1">
-              <output id="reader-playback-value">1.0x</output>
-            </label>
+        <div class="pdf-pane">
+          <div id="pdf-viewer" aria-label="Selected PDF"><p class="pdf-loading">The PDF will render here when reading begins.</p></div>
+          <div class="zoom-float" title="Command/Ctrl + scroll zooms around the pointer">
+            <button id="pdf-zoom-out" class="icon-btn" type="button" aria-label="Zoom out"><svg><use href="#i-minus"/></svg></button>
+            <output id="pdf-zoom-value">125%</output>
+            <button id="pdf-zoom-in" class="icon-btn" type="button" aria-label="Zoom in"><svg><use href="#i-plus"/></svg></button>
           </div>
-          <div class="reader-actions">
+        </div>
+        <aside class="reader-panel">
+          <div class="player">
+            <div class="transport">
+              <button id="reader-prev" class="icon-btn" type="button" aria-label="Previous paragraph" aria-keyshortcuts="K" disabled><svg><use href="#i-prev"/></svg></button>
+              <button id="reader-toggle" class="play-btn" type="button" aria-label="Play" aria-keyshortcuts="Space" disabled><svg><use href="#i-play"/></svg></button>
+              <button id="reader-next" class="icon-btn" type="button" aria-label="Next paragraph" aria-keyshortcuts="J" disabled><svg><use href="#i-next"/></svg></button>
+              <span class="transport-meta">
+                <span id="reader-progress">Preparing reader…</span>
+                <span id="reader-detail" class="transport-sub"></span>
+              </span>
+            </div>
+            <div class="player-track">
+              <div class="progress"><span id="reader-progress-fill" style="width:0%"></span></div>
+              <label class="speed" for="reader-playback-speed">
+                <input id="reader-playback-speed" type="range" min="0.5" max="2" step="0.1" value="1" aria-label="Playback speed">
+                <output id="reader-playback-value">1.0×</output>
+              </label>
+            </div>
+            <p id="reader-status" role="status"></p>
+          </div>
+          <div class="tabs">
             <button id="reader-outline" type="button" disabled>Outline</button>
             <button id="reader-text" type="button" disabled>Text</button>
             <button id="reader-highlights" type="button" disabled>Highlights</button>
-            <button id="reader-bookmark" data-secondary type="button" disabled>Highlight</button>
-            <button id="reader-annotate" data-secondary type="button" disabled>Add note</button>
-            <button id="reader-listen-only" data-secondary type="button" disabled>Listen only</button>
-            <button id="reader-local-assist" data-secondary type="button">Local assistance</button>
-            <button id="reader-export-paragraph" data-secondary type="button" disabled>Export paragraph</button>
-            <button id="reader-export-section" data-secondary type="button" disabled>Export section</button>
-            <button id="reader-export-document" data-secondary type="button" disabled>Export document</button>
-            <button id="reader-export-cancel" type="button" hidden>Cancel export</button>
           </div>
           <div class="reader-search">
-            <input id="reader-search" type="search" placeholder="Search this reading queue" aria-label="Search this reading queue">
-            <button id="reader-search-prev" type="button" disabled>↑</button>
-            <button id="reader-search-next" type="button" disabled>↓</button>
+            <span class="search-field">
+              <svg><use href="#i-search"/></svg>
+              <input id="reader-search" type="search" placeholder="Search this reading queue" aria-label="Search this reading queue">
+            </span>
+            <button id="reader-search-prev" class="icon-btn" type="button" aria-label="Previous result" disabled><svg><use href="#i-up"/></svg></button>
+            <button id="reader-search-next" class="icon-btn" type="button" aria-label="Next result" disabled><svg><use href="#i-down"/></svg></button>
             <span id="reader-search-count">0 results</span>
           </div>
           <section id="reader-drawer" hidden aria-live="polite"></section>
-          <p id="reader-status" role="status"></p>
-          <div id="transcript" aria-live="polite"></div>
+          <div class="reader-tools">
+            <button id="reader-highlight-toggle" class="btn btn-ghost" type="button" disabled><svg><use href="#i-mark"/></svg>Highlight</button>
+            <button id="reader-annotate" class="btn btn-ghost" type="button" disabled><svg><use href="#i-note"/></svg>Note</button>
+            <details class="menu" id="export-menu">
+              <summary><svg><use href="#i-download"/></svg>Export</summary>
+              <div class="menu-list">
+                <button id="reader-export-paragraph" type="button" disabled>This paragraph</button>
+                <button id="reader-export-section" type="button" disabled>This section</button>
+                <button id="reader-export-document" type="button" disabled>Whole document</button>
+              </div>
+            </details>
+            <button id="reader-export-cancel" class="btn btn-ghost" type="button" hidden>Cancel export</button>
+          </div>
           <audio id="reader-player"></audio>
         </aside>
       </div>
     </section>
-    <section id="entry-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="entry-title">
-      <form class="entry-card" id="entry-form">
-        <h2 id="entry-title">Add note</h2><p id="entry-description"></p>
-        <input id="entry-name" hidden>
-        <textarea id="entry-note" rows="4" placeholder="Optional note"></textarea>
-        <div class="dialog-actions"><button id="entry-cancel" class="secondary" type="button">Cancel</button><button type="submit">Save</button></div>
+
+    <div class="modal" id="entry-dialog" hidden>
+      <form class="modal-card" id="entry-form" role="dialog" aria-modal="true" aria-labelledby="entry-title">
+        <div class="modal-head"><div><h2 id="entry-title">Add note</h2></div></div>
+        <div class="modal-body">
+          <p id="entry-description" class="field-hint" style="margin:0 0 14px"></p>
+          <input id="entry-name" placeholder="Name" aria-label="Name" hidden>
+          <textarea id="entry-note" rows="4" placeholder="Optional note" aria-label="Optional note"></textarea>
+        </div>
+        <div class="modal-foot">
+          <button id="entry-cancel" class="btn btn-ghost" type="button">Cancel</button>
+          <button id="entry-confirm" class="btn btn-primary" type="submit">Save</button>
+        </div>
       </form>
-    </section>
-    <section id="reader-help-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="reader-help-title">
-      <div class="shortcut-card">
-        <h2 id="reader-help-title">Reader shortcuts</h2>
-        <dl>
-          <dt>Space</dt><dd>Play or pause</dd>
-          <dt>J / K</dt><dd>Next / previous paragraph</dd>
-          <dt>[ / ]</dt><dd>Slower / faster playback</dd>
-          <dt>- / =</dt><dd>Zoom out / in</dd>
-          <dt>Esc</dt><dd>Close this help, or exit reader</dd>
-        </dl>
-        <button id="reader-help-close" type="button">Close</button>
+    </div>
+
+    <div class="modal" id="reader-help-dialog" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reader-help-title">
+        <div class="modal-head"><div><h2 id="reader-help-title">Keyboard shortcuts</h2></div></div>
+        <div class="modal-body">
+          <dl class="shortcut-list">
+            <dt><kbd>Space</kbd></dt><dd>Play or pause</dd>
+            <dt><kbd>J</kbd><kbd>K</kbd></dt><dd>Next / previous paragraph</dd>
+            <dt><kbd>[</kbd><kbd>]</kbd></dt><dd>Slower / faster playback</dd>
+            <dt><kbd>−</kbd><kbd>=</kbd></dt><dd>Zoom out / in</dd>
+            <dt><kbd>Esc</kbd></dt><dd>Close this dialog, or leave the reader</dd>
+          </dl>
+        </div>
+        <div class="modal-foot"><button id="reader-help-close" class="btn btn-primary" type="button">Close</button></div>
       </div>
-    </section>
+    </div>
 
     <script>
-      const text = document.querySelector('#text');
-      const speed = document.querySelector('#speed');
       const skipBracketedText = document.querySelector('#skip-bracketed-text');
-      const button = document.querySelector('#convert');
       const pdf = document.querySelector('#pdf');
       const choosePdf = document.querySelector('#choose-pdf');
       const fileName = document.querySelector('#file-name');
       const documentSetup = document.querySelector('#document-setup');
       const importCancel = document.querySelector('#import-cancel');
+      const importClose = document.querySelector('#import-close');
+      const importChoose = document.querySelector('#import-choose');
       const extract = document.querySelector('#extract');
       const readingOrder = document.querySelector('#reading-order');
       const extractionPreset = document.querySelector('#extraction-preset');
-      const readDocument = document.querySelector('#read-document');
-      const player = document.querySelector('#player');
-      const status = document.querySelector('#status');
       const pdfStatus = document.querySelector('#pdf-status');
       const reader = document.querySelector('#reader');
       const readerTitle = document.querySelector('#reader-title');
@@ -300,14 +514,17 @@
       const readerPlaybackSpeed = document.querySelector('#reader-playback-speed');
       const readerPlaybackValue = document.querySelector('#reader-playback-value');
       const readerProgress = document.querySelector('#reader-progress');
+      const readerDetail = document.querySelector('#reader-detail');
+      const readerProgressFill = document.querySelector('#reader-progress-fill');
+      const readerPrev = document.querySelector('#reader-prev');
+      const readerNext = document.querySelector('#reader-next');
       const readerStatus = document.querySelector('#reader-status');
-      const transcript = document.querySelector('#transcript');
       const readerClose = document.querySelector('#reader-close');
       const readerHelp = document.querySelector('#reader-help');
       const readerHelpDialog = document.querySelector('#reader-help-dialog');
       const readerHelpClose = document.querySelector('#reader-help-close');
       const readerOutline = document.querySelector('#reader-outline');
-      const readerBookmark = document.querySelector('#reader-bookmark');
+      const readerHighlightToggle = document.querySelector('#reader-highlight-toggle');
       const readerText = document.querySelector('#reader-text');
       const readerHighlightsButton = document.querySelector('#reader-highlights');
       const readerSearch = document.querySelector('#reader-search');
@@ -315,27 +532,27 @@
       const readerSearchNext = document.querySelector('#reader-search-next');
       const readerSearchCount = document.querySelector('#reader-search-count');
       const readerDrawer = document.querySelector('#reader-drawer');
-      const keepOffline = document.querySelector('#keep-offline');
       const newCollection = document.querySelector('#new-collection');
       const clearLibrary = document.querySelector('#clear-library');
       const libraryList = document.querySelector('#library-list');
+      const libraryCount = document.querySelector('#library-count');
       const collectionList = document.querySelector('#collection-list');
+      const exportMenu = document.querySelector('#export-menu');
       const readerExportParagraph = document.querySelector('#reader-export-paragraph');
       const readerExportSection = document.querySelector('#reader-export-section');
       const readerExportDocument = document.querySelector('#reader-export-document');
       const readerExportCancel = document.querySelector('#reader-export-cancel');
       const readerAnnotate = document.querySelector('#reader-annotate');
       const readerListenOnly = document.querySelector('#reader-listen-only');
-      const readerLocalAssist = document.querySelector('#reader-local-assist');
       const entryDialog = document.querySelector('#entry-dialog');
       const entryForm = document.querySelector('#entry-form');
       const entryTitle = document.querySelector('#entry-title');
       const entryDescription = document.querySelector('#entry-description');
       const entryName = document.querySelector('#entry-name');
       const entryNote = document.querySelector('#entry-note');
+      const entryConfirm = document.querySelector('#entry-confirm');
       const entryCancel = document.querySelector('#entry-cancel');
-      let audioUrl;
-      let pdfUrl;
+      let preparedText = '';
       let preparedParagraphs = [];
       let allPreparedParagraphs = [];
       let lastFilterSummary;
@@ -345,7 +562,6 @@
       let readerOutlineItems = [];
       let readerSearchResults = [];
       let readerSearchResultIndex = -1;
-      let readerBookmarks = [];
       let readerSessionStartedAt = 0;
       let readerCompletedCharacters = 0;
       let readerCompletedSeconds = 0;
@@ -355,6 +571,7 @@
       let activeReaderView = 'outline';
       let entrySubmit;
       let openingGalleryKey;
+      let activeCollectionId = null;
       let readerAutoplay = false;
       let pdfjsLib;
       let pdfDocument;
@@ -368,7 +585,10 @@
       let readerAudioUrl;
       let readerItems = [];
       let readerCurrentIndex = -1;
-      let readerVoiceSpeed = 1;
+      // Paragraph audio is always generated at Kokoro's natural speed; the
+      // reader's speed control adjusts <audio> playback rate so a change takes
+      // effect immediately instead of discarding prepared audio.
+      const SYNTHESIS_SPEED = 1;
       const PREFETCH_COUNT = 2;
       const PDF_MIN_SCALE = 0.75;
       const PDF_MAX_SCALE = 2.5;
@@ -487,8 +707,7 @@
         const selected = selectParagraphsForPreset(allPreparedParagraphs, extractionPreset.value);
         preparedParagraphs = selected.paragraphs;
         lastFilterSummary = selected.filter_summary;
-        text.value = preparedParagraphs.map(paragraph => paragraph.text).join('\n\n');
-        readDocument.disabled = !preparedParagraphs.length;
+        preparedText = preparedParagraphs.map(paragraph => paragraph.text).join('\n\n');
         pdfStatus.textContent = `${filterSummaryMessage(lastFilterSummary)} This preset was applied locally without re-extracting.`;
         return true;
       }
@@ -500,13 +719,12 @@
       function openReaderDatabase() {
         return new Promise((resolve, reject) => {
           if (!window.indexedDB) { reject(new Error('IndexedDB is unavailable in this browser.')); return; }
-          const request = indexedDB.open('pdfreader', 4);
+          const request = indexedDB.open('pdfreader', 5);
           request.onupgradeneeded = () => {
             const database = request.result;
-            if (!database.objectStoreNames.contains('bookmarks')) {
-              const store = database.createObjectStore('bookmarks', {keyPath: 'id'});
-              store.createIndex('documentKey', 'documentKey', {unique: false});
-            }
+            // Version 5 folds the separate bookmark store into `annotations`,
+            // which already holds a highlight and its optional note together.
+            if (database.objectStoreNames.contains('bookmarks')) database.deleteObjectStore('bookmarks');
             if (!database.objectStoreNames.contains('documents')) {
               database.createObjectStore('documents', {keyPath: 'key'});
             }
@@ -534,31 +752,21 @@
             }
           };
           request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error || new Error('Could not open local bookmark storage.'));
+          request.onerror = () => reject(request.error || new Error('Could not open local reader storage.'));
         });
       }
 
-      async function listBookmarks() {
-        if (!currentDocumentKey) return [];
-        const database = await openReaderDatabase();
-        try {
-          return await new Promise((resolve, reject) => {
-            const request = database.transaction('bookmarks', 'readonly').objectStore('bookmarks').index('documentKey').getAll(currentDocumentKey);
-            request.onsuccess = () => resolve(request.result.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-            request.onerror = () => reject(request.error);
-          });
-        } finally { database.close(); }
-      }
-
-      function openEntryDialog({title, description, name = '', note = '', onSave}) {
+      function openEntryDialog({title, description, name = '', note = '', withNote = true, confirmLabel = 'Save', onSave}) {
         entryTitle.textContent = title;
         entryDescription.textContent = description;
         entryName.value = name;
         entryName.hidden = !name;
         entryNote.value = note;
+        entryNote.hidden = !withNote;
+        entryConfirm.textContent = confirmLabel;
         entryDialog.hidden = false;
         entrySubmit = onSave;
-        entryNote.focus();
+        (name ? entryName : withNote ? entryNote : entryConfirm).focus();
       }
 
       entryCancel.addEventListener('click', () => { entryDialog.hidden = true; entrySubmit = undefined; });
@@ -582,39 +790,61 @@
         } finally { database.close(); }
       }
 
-      async function createHighlight() {
-        const item = readerItems[readerCurrentIndex];
-        if (!currentDocumentKey || !item?.sourceId) return;
-        const source = preparedParagraphs.find(paragraph => paragraph.id === item.sourceId);
-        const existing = readerAnnotations.find(annotation => annotation.sourceId === item.sourceId);
-        if (existing) { readerStatus.textContent = 'This paragraph is already highlighted.'; return; }
+      async function refreshHighlights(message) {
+        readerAnnotations = await listSourceLinkedRecords('annotations');
+        refreshPdfHighlights();
+        if (message) readerStatus.textContent = message;
+        if (activeReaderView === 'highlights') showHighlights();
+      }
+
+      async function toggleHighlight(sourceId = readerItems[readerCurrentIndex]?.sourceId) {
+        if (!currentDocumentKey || !sourceId) return;
+        const item = readerItems.find(entry => entry.sourceId === sourceId);
+        if (!item) return;
+        const existing = highlightFor(sourceId);
+        if (existing?.note) {
+          // Removing this record would take its note with it, so confirm first.
+          openEntryDialog({
+            title: 'Remove highlight',
+            description: 'This paragraph has a note attached. Removing the highlight deletes the note too.',
+            withNote: false,
+            confirmLabel: 'Remove both',
+            onSave: async () => {
+              await deleteLocalRecord('annotations', existing.id);
+              await refreshHighlights('Highlight and note removed.');
+            },
+          });
+          return;
+        }
+        if (existing) {
+          await deleteLocalRecord('annotations', existing.id);
+          await refreshHighlights('Highlight removed.');
+          return;
+        }
+        const source = preparedParagraphs.find(paragraph => paragraph.id === sourceId);
         await putLocalRecord('annotations', {
-          id: `${currentDocumentKey}:${item.sourceId}`,
+          id: `${currentDocumentKey}:${sourceId}`,
           documentKey: currentDocumentKey,
-          sourceId: item.sourceId,
+          sourceId,
           boxes: source?.boxes || [],
           color: '#e3a400', note: '', excerpt: item.text.slice(0, 240),
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
         });
-        readerAnnotations = await listSourceLinkedRecords('annotations');
-        refreshPdfHighlights();
-        readerStatus.textContent = 'Highlighted.';
-        if (activeReaderView === 'highlights') showHighlights();
+        await refreshHighlights('Highlighted.');
       }
 
-      async function addNote() {
-        const item = readerItems[readerCurrentIndex];
-        if (!currentDocumentKey || !item?.sourceId) return;
-        const source = preparedParagraphs.find(paragraph => paragraph.id === item.sourceId);
-        const existing = readerAnnotations.find(annotation => annotation.sourceId === item.sourceId);
-        openEntryDialog({title: 'Add note', description: item.text.slice(0, 160), note: existing?.note || '', onSave: async ({note}) => {
-          await putLocalRecord('annotations', {...existing, id: existing?.id || `${currentDocumentKey}:${item.sourceId}`, documentKey: currentDocumentKey, sourceId: item.sourceId, boxes: source?.boxes || [], color: '#e3a400', note, excerpt: item.text.slice(0, 240), createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString()});
-          readerAnnotations = await listSourceLinkedRecords('annotations'); refreshPdfHighlights(); showHighlights();
+      // Annotating names its paragraph outright, so it never has to move the
+      // reading position to reach one.
+      async function addNote(sourceId = readerItems[readerCurrentIndex]?.sourceId) {
+        if (!currentDocumentKey || !sourceId) return;
+        const item = readerItems.find(entry => entry.sourceId === sourceId);
+        if (!item) return;
+        const source = preparedParagraphs.find(paragraph => paragraph.id === sourceId);
+        const existing = highlightFor(sourceId);
+        openEntryDialog({title: existing?.note ? 'Edit note' : 'Add note', description: item.text.slice(0, 160), note: existing?.note || '', confirmLabel: existing?.note ? 'Update' : 'Save', onSave: async ({note}) => {
+          await putLocalRecord('annotations', {...existing, id: existing?.id || `${currentDocumentKey}:${sourceId}`, documentKey: currentDocumentKey, sourceId, boxes: source?.boxes || [], color: '#e3a400', note, excerpt: item.text.slice(0, 240), createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString()});
+          await refreshHighlights(note ? 'Note saved.' : 'Highlighted.');
         }});
-      }
-
-      function configureLocalAssistance() {
-        readerStatus.textContent = 'Local assistance is not configured. This reader never sends document text to a remote model.';
       }
 
       async function putLocalRecord(storeName, record) {
@@ -643,6 +873,17 @@
         renderLibrary();
       }
 
+      async function deleteLocalRecord(storeName, key) {
+        const database = await openReaderDatabase();
+        try {
+          await new Promise((resolve, reject) => {
+            const request = database.transaction(storeName, 'readwrite').objectStore(storeName).delete(key);
+            request.onsuccess = resolve;
+            request.onerror = () => reject(request.error);
+          });
+        } finally { database.close(); }
+      }
+
       async function getLocalRecord(storeName, key) {
         const database = await openReaderDatabase();
         try {
@@ -665,25 +906,6 @@
         } finally { database.close(); }
       }
 
-      async function keepOfflineCopy() {
-        if (!currentDocumentKey || !currentDocumentFile) return;
-        keepOffline.disabled = true;
-        try {
-          const persisted = await navigator.storage?.persist?.();
-          if (persisted !== true) {
-            throw new Error('Persistent browser storage is unavailable, so this PDF cannot be kept in the gallery.');
-          }
-          const estimate = await navigator.storage?.estimate?.();
-          if (estimate?.quota && estimate.quota - (estimate.usage || 0) < currentDocumentFile.size) {
-            throw new Error('Browser storage quota is too small for this offline PDF.');
-          }
-          await putLocalRecord('offlineFiles', {key: currentDocumentKey, file: currentDocumentFile});
-          await registerRecentDocument(currentDocumentFile, {offline: true, storagePersistent: Boolean(persisted)});
-          pdfStatus.textContent = 'Offline copy saved in this browser. It remains local to this browser profile.';
-        } catch (error) { pdfStatus.textContent = error.message || 'Could not save an offline copy.'; }
-        finally { keepOffline.disabled = false; }
-      }
-
       async function retainPdfInGallery(file) {
         if (!currentDocumentKey) return false;
         try {
@@ -695,8 +917,6 @@
           const persisted = await navigator.storage?.persist?.();
           await putLocalRecord('offlineFiles', {key: currentDocumentKey, file});
           await registerRecentDocument(file, {offline: true, storagePersistent: Boolean(persisted)});
-          keepOffline.textContent = 'Stored in gallery';
-          keepOffline.disabled = true;
           return true;
         } catch { return false; }
       }
@@ -716,7 +936,7 @@
       async function removeDocument(key) {
         const database = await openReaderDatabase();
         try {
-          const transaction = database.transaction(['documents', 'offlineFiles', 'extractions', 'bookmarks', 'annotations', 'reviews', 'documentCollections'], 'readwrite');
+          const transaction = database.transaction(['documents', 'offlineFiles', 'extractions', 'annotations', 'reviews', 'documentCollections'], 'readwrite');
           transaction.objectStore('documents').delete(key);
           transaction.objectStore('offlineFiles').delete(key);
           transaction.objectStore('extractions').delete(key);
@@ -728,7 +948,6 @@
               cursor.delete(); cursor.continue();
             };
           };
-          deleteMatching('bookmarks');
           deleteMatching('annotations');
           deleteMatching('reviews');
           deleteMatching('documentCollections');
@@ -744,38 +963,58 @@
       }
 
       async function clearAllLibraryData() {
-        openEntryDialog({title: 'Clear local library', description: 'This removes gallery records, saved extraction text, offline files, highlights, notes, and bookmarks from this browser. Click Save to continue.', onSave: async () => {
-        const database = await openReaderDatabase();
-        try {
-          const transaction = database.transaction(['documents', 'offlineFiles', 'extractions', 'bookmarks', 'annotations', 'reviews', 'collections', 'documentCollections'], 'readwrite');
-          ['documents', 'offlineFiles', 'extractions', 'bookmarks', 'annotations', 'reviews', 'collections', 'documentCollections'].forEach(store => transaction.objectStore(store).clear());
-          await new Promise((resolve, reject) => { transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); });
-        } finally { database.close(); }
-        try {
-          Object.keys(localStorage).filter(key => key.startsWith('pdfreader.resume.')).forEach(key => localStorage.removeItem(key));
-        } catch { /* Storage is optional. */ }
-        renderLibrary();
-        }});
+        openEntryDialog({
+          title: 'Clear local library',
+          description: 'This removes every gallery record, saved extraction, stored PDF, highlight, and note from this browser. It cannot be undone.',
+          withNote: false,
+          confirmLabel: 'Clear everything',
+          onSave: async () => {
+            const stores = ['documents', 'offlineFiles', 'extractions', 'annotations', 'reviews', 'collections', 'documentCollections'];
+            const database = await openReaderDatabase();
+            try {
+              const transaction = database.transaction(stores, 'readwrite');
+              stores.forEach(store => transaction.objectStore(store).clear());
+              await new Promise((resolve, reject) => { transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); });
+            } finally { database.close(); }
+            try {
+              Object.keys(localStorage).filter(key => key.startsWith('pdfreader.resume.')).forEach(key => localStorage.removeItem(key));
+            } catch { /* Storage is optional. */ }
+            readerAnnotations = [];
+            renderLibrary();
+          },
+        });
+      }
+
+      async function saveCollection(name) {
+        const collections = await allLocalRecords('collections');
+        const existing = collections.find(collection => collection.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+        if (existing) return existing;
+        const collection = {id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, name, color: '#7052c9', order: Date.now(), createdAt: new Date().toISOString()};
+        await putLocalRecord('collections', collection);
+        return collection;
       }
 
       async function createCollection() {
-        openEntryDialog({title: 'New collection', description: 'Give this local collection a name.', name: 'Collection', onSave: async ({name}) => {
+        openEntryDialog({title: 'New collection', description: 'Collections group documents locally. Deleting one never deletes its documents.', name: 'Collection', withNote: false, onSave: async ({name}) => {
           if (!name) return;
-          await putLocalRecord('collections', {id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, name, color: '#7052c9', order: Date.now(), createdAt: new Date().toISOString()});
+          await saveCollection(name);
           renderLibrary();
         }});
       }
 
-      async function addCurrentDocumentToCollection() {
-        if (!currentDocumentKey) return;
-        const collections = await allLocalRecords('collections');
-        if (!collections.length) { await createCollection(); return addCurrentDocumentToCollection(); }
-        const collection = collections[0];
-        await putLocalRecord('documentCollections', {id: `${currentDocumentKey}:${collection.id}`, documentKey: currentDocumentKey, collectionId: collection.id, order: Date.now()}); renderLibrary();
+      // Naming the collection here avoids a hidden "first collection wins"
+      // rule: an existing name is reused, and a new name creates a collection.
+      async function addDocumentToCollection(documentRecord) {
+        openEntryDialog({title: 'Add to collection', description: `Name a collection for ${documentRecord.fileName}. An existing name adds it to that collection.`, name: 'Collection', withNote: false, confirmLabel: 'Add', onSave: async ({name}) => {
+          if (!name) return;
+          const collection = await saveCollection(name);
+          await putLocalRecord('documentCollections', {id: `${documentRecord.key}:${collection.id}`, documentKey: documentRecord.key, collectionId: collection.id, order: Date.now()});
+          renderLibrary();
+        }});
       }
 
       async function renameCollection(collection) {
-        openEntryDialog({title: 'Rename collection', description: 'Update this collection name.', name: collection.name, onSave: async ({name}) => {
+        openEntryDialog({title: 'Rename collection', description: 'Update this collection name.', name: collection.name, withNote: false, onSave: async ({name}) => {
           if (!name) return; await putLocalRecord('collections', {...collection, name}); renderLibrary();
         }});
       }
@@ -797,59 +1036,191 @@
 
       async function renderLibrary() {
         try {
-          const [documents, collections, memberships, bookmarks] = await Promise.all([
-            allLocalRecords('documents'), allLocalRecords('collections'), allLocalRecords('documentCollections'), allLocalRecords('bookmarks'),
+          const [documents, collections, memberships, annotations] = await Promise.all([
+            allLocalRecords('documents'), allLocalRecords('collections'),
+            allLocalRecords('documentCollections'), allLocalRecords('annotations'),
           ]);
           const collectionById = new Map(collections.map(item => [item.id, item]));
+          if (activeCollectionId && !collectionById.has(activeCollectionId)) activeCollectionId = null;
+          renderCollectionChips(collections, memberships);
+          const visible = documents
+            .filter(documentRecord => !activeCollectionId
+              || memberships.some(item => item.documentKey === documentRecord.key && item.collectionId === activeCollectionId))
+            .sort((a, b) => (b.lastOpenedAt || '').localeCompare(a.lastOpenedAt || ''));
+          libraryCount.textContent = String(documents.length);
+          libraryCount.hidden = !documents.length;
           libraryList.replaceChildren();
-          collectionList.replaceChildren();
-          if (collections.length) {
-            const title = document.createElement('p'); title.className = 'library-empty'; title.textContent = 'Collections'; collectionList.append(title);
-            collections.sort((a, b) => a.order - b.order).forEach(collection => {
-              const item = document.createElement('div'); item.className = 'library-item';
-              const info = document.createElement('div'); info.className = 'library-item-info';
-              const name = document.createElement('div'); name.className = 'library-item-name'; name.textContent = collection.name;
-              const meta = document.createElement('div'); meta.className = 'library-item-meta'; meta.textContent = 'Documents remain when this collection is deleted.';
-              info.append(name, meta);
-              const rename = document.createElement('button'); rename.type = 'button'; rename.textContent = 'Rename'; rename.addEventListener('click', () => renameCollection(collection));
-              const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Delete'; remove.addEventListener('click', () => deleteCollection(collection));
-              item.append(info, rename, remove); collectionList.append(item);
-            });
-          }
-          if (!documents.length) {
-            libraryList.innerHTML = '<p class="library-empty">Recent PDFs will appear here. Files are not kept unless you explicitly save an offline copy.</p>';
+          if (!visible.length) {
+            libraryList.append(emptyState(documents.length
+              ? 'No documents in this collection yet. Use the folder button on a card to add one.'
+              : 'Add a PDF to start your local library. Text, position, highlights, and notes stay in this browser.'));
             return;
           }
-          documents.sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt)).forEach(documentRecord => {
-            const item = document.createElement('div'); item.className = 'library-item';
-            if (documentRecord.thumbnail) {
-              const thumbnail = document.createElement('img'); thumbnail.className = 'library-thumbnail';
-              const url = typeof documentRecord.thumbnail === 'string' ? documentRecord.thumbnail : URL.createObjectURL(documentRecord.thumbnail);
-              thumbnail.src = url;
-              if (typeof documentRecord.thumbnail !== 'string') thumbnail.onload = () => URL.revokeObjectURL(url);
-              item.append(thumbnail);
-            }
-            const info = document.createElement('div'); info.className = 'library-item-info';
-            const name = document.createElement('div'); name.className = 'library-item-name'; name.textContent = documentRecord.fileName;
-            const meta = document.createElement('div'); meta.className = 'library-item-meta';
-            const tags = memberships.filter(item => item.documentKey === documentRecord.key).map(item => collectionById.get(item.collectionId)?.name).filter(Boolean);
-            const bookmarkCount = bookmarks.filter(bookmark => bookmark.documentKey === documentRecord.key).length;
-            const progress = documentRecord.progress?.totalParagraphs
-              ? ` · ${documentRecord.progress.paragraphIndex + 1}/${documentRecord.progress.totalParagraphs}` : '';
-            const opened = documentRecord.lastOpenedAt ? ` · opened ${new Date(documentRecord.lastOpenedAt).toLocaleDateString()}` : '';
-            meta.textContent = `${documentRecord.offline ? 'Offline copy' : 'Available after reselecting'} · ${documentRecord.pageCount || '?'} pages${progress} · ${bookmarkCount} bookmarks${opened}${tags.length ? ` · ${tags.join(', ')}` : ''}`;
-            info.append(name, meta);
-            const collect = document.createElement('button'); collect.type = 'button'; collect.textContent = '+'; collect.title = 'Add current document to a collection';
-            collect.disabled = documentRecord.key !== currentDocumentKey;
-            collect.addEventListener('click', addCurrentDocumentToCollection);
-            const open = document.createElement('button'); open.type = 'button'; open.textContent = documentRecord.offline ? 'Open' : 'Select original';
-            open.title = documentRecord.offline ? 'Open the saved PDF' : 'Select the original PDF to restore this legacy gallery entry';
-            open.addEventListener('click', () => documentRecord.offline ? openGalleryDocument(documentRecord) : choosePdf.click());
-            const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Delete'; remove.addEventListener('click', () => removeDocument(documentRecord.key));
-            const actions = document.createElement('div'); actions.className = 'library-item-actions';
-            actions.append(open, collect, remove); item.append(info, actions); libraryList.append(item);
+          visible.forEach(documentRecord => {
+            const tags = memberships
+              .filter(item => item.documentKey === documentRecord.key)
+              .map(item => collectionById.get(item.collectionId)?.name).filter(Boolean);
+            const highlights = annotations.filter(annotation => annotation.documentKey === documentRecord.key).length;
+            libraryList.append(documentCard(documentRecord, tags, highlights));
           });
         } catch { /* Library storage is optional. */ }
+      }
+
+      function emptyState(message) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.innerHTML = '<svg><use href="#i-file"/></svg>';
+        const text = document.createElement('p');
+        text.textContent = message;
+        empty.append(text);
+        return empty;
+      }
+
+      function renderCollectionChips(collections, memberships) {
+        collectionList.replaceChildren();
+        collectionList.hidden = !collections.length;
+        if (!collections.length) return;
+        const counts = new Map();
+        memberships.forEach(item => counts.set(item.collectionId, (counts.get(item.collectionId) || 0) + 1));
+        const chip = (label, id) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'chip';
+          button.textContent = label;
+          button.setAttribute('aria-pressed', String(activeCollectionId === id));
+          button.addEventListener('click', () => { activeCollectionId = id; renderLibrary(); });
+          return button;
+        };
+        collectionList.append(chip('All', null));
+        collections.sort((a, b) => a.order - b.order).forEach(collection => {
+          collectionList.append(chip(`${collection.name} · ${counts.get(collection.id) || 0}`, collection.id));
+        });
+        // Renaming and deleting apply to the selected collection, so the
+        // controls only appear once one is actually selected.
+        const selected = collections.find(collection => collection.id === activeCollectionId);
+        if (selected) {
+          const rename = document.createElement('button');
+          rename.type = 'button'; rename.className = 'btn btn-quiet btn-sm'; rename.textContent = 'Rename';
+          rename.addEventListener('click', () => renameCollection(selected));
+          const remove = document.createElement('button');
+          remove.type = 'button'; remove.className = 'btn btn-quiet btn-danger btn-sm'; remove.textContent = 'Delete collection';
+          remove.addEventListener('click', () => deleteCollection(selected));
+          collectionList.append(rename, remove);
+        }
+      }
+
+      function documentCard(documentRecord, tags, highlightCount) {
+        const card = document.createElement('article');
+        card.className = 'doc';
+        const open = () => {
+          if (documentRecord.offline) { openGalleryDocument(documentRecord); return; }
+          // Reselecting a metadata-only entry should reuse its saved
+          // extraction rather than importing the same PDF again.
+          openingGalleryKey = documentRecord.key;
+          choosePdf.click();
+        };
+
+        const cover = document.createElement('button');
+        cover.type = 'button';
+        cover.className = 'doc-cover';
+        cover.setAttribute('aria-label', `Open ${documentRecord.fileName}`);
+        cover.addEventListener('click', open);
+        if (documentRecord.thumbnail) {
+          const thumbnail = document.createElement('img');
+          thumbnail.className = 'library-thumbnail';
+          thumbnail.alt = '';
+          const url = typeof documentRecord.thumbnail === 'string'
+            ? documentRecord.thumbnail : URL.createObjectURL(documentRecord.thumbnail);
+          thumbnail.src = url;
+          if (typeof documentRecord.thumbnail !== 'string') thumbnail.onload = () => URL.revokeObjectURL(url);
+          cover.append(thumbnail);
+        } else {
+          cover.innerHTML = '<span class="doc-cover-blank"><svg><use href="#i-file"/></svg></span>';
+        }
+
+        const body = document.createElement('div');
+        body.className = 'doc-body';
+        const name = document.createElement('h3');
+        name.className = 'doc-name truncate';
+        name.textContent = documentRecord.fileName;
+        name.title = documentRecord.fileName;
+        const meta = document.createElement('p');
+        meta.className = 'doc-meta';
+        const facts = [];
+        if (documentRecord.pageCount) facts.push(`${documentRecord.pageCount} page${documentRecord.pageCount === 1 ? '' : 's'}`);
+        if (highlightCount) facts.push(`${highlightCount} highlight${highlightCount === 1 ? '' : 's'}`);
+        if (documentRecord.lastOpenedAt) facts.push(`opened ${new Date(documentRecord.lastOpenedAt).toLocaleDateString()}`);
+        meta.textContent = facts.join(' · ');
+        body.append(name, meta);
+
+        const total = documentRecord.progress?.totalParagraphs;
+        if (total) {
+          const read = Math.min(total, (documentRecord.progress.paragraphIndex || 0) + 1);
+          const percent = Math.round((read / total) * 100);
+          const row = document.createElement('div');
+          row.className = 'doc-progress';
+          const bar = document.createElement('div');
+          bar.className = 'progress';
+          bar.innerHTML = `<span style="width:${percent}%"></span>`;
+          const label = document.createElement('span');
+          label.textContent = percent >= 100 ? 'Finished' : `${percent}%`;
+          row.append(bar, label);
+          body.append(row);
+        }
+        if (!documentRecord.offline) {
+          const pending = document.createElement('p');
+          pending.className = 'doc-meta doc-badge pending';
+          pending.style.marginTop = '9px';
+          pending.textContent = 'Available after reselecting';
+          body.append(pending);
+        }
+        if (tags.length) {
+          const tagRow = document.createElement('div');
+          tagRow.className = 'doc-tags';
+          tags.forEach(tag => {
+            const chip = document.createElement('span');
+            chip.className = 'tag';
+            chip.textContent = tag;
+            tagRow.append(chip);
+          });
+          body.append(tagRow);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'doc-actions';
+        const openButton = document.createElement('button');
+        openButton.type = 'button';
+        openButton.className = 'btn btn-ghost btn-sm';
+        openButton.textContent = documentRecord.offline ? 'Open' : 'Select original';
+        openButton.addEventListener('click', open);
+        const collect = document.createElement('button');
+        collect.type = 'button';
+        collect.className = 'icon-btn';
+        collect.title = 'Add to a collection';
+        collect.setAttribute('aria-label', `Add ${documentRecord.fileName} to a collection`);
+        collect.innerHTML = '<svg><use href="#i-folder"/></svg>';
+        collect.addEventListener('click', () => addDocumentToCollection(documentRecord));
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'icon-btn';
+        remove.title = 'Delete from this browser';
+        remove.setAttribute('aria-label', `Delete ${documentRecord.fileName}`);
+        remove.innerHTML = '<svg><use href="#i-trash"/></svg>';
+        remove.addEventListener('click', () => confirmRemoveDocument(documentRecord));
+        actions.append(openButton, collect, remove);
+
+        card.append(cover, body, actions);
+        return card;
+      }
+
+      function confirmRemoveDocument(documentRecord) {
+        openEntryDialog({
+          title: 'Delete document',
+          description: `Remove ${documentRecord.fileName}, its saved text, position, highlights, and notes from this browser?`,
+          withNote: false,
+          confirmLabel: 'Delete',
+          onSave: () => removeDocument(documentRecord.key),
+        });
       }
 
       async function openGalleryDocument(documentRecord) {
@@ -857,21 +1228,40 @@
         fileName.textContent = documentRecord.fileName;
         currentDocumentKey = documentRecord.key;
         currentDocumentFile = await openOfflineDocument(documentRecord.key);
-        if (!currentDocumentFile) return;
+        if (!currentDocumentFile) {
+          openingGalleryKey = documentRecord.key;
+          documentSetup.hidden = false;
+          pdfStatus.textContent = 'This document is no longer stored in the browser. Select the original PDF to reopen it.';
+          return;
+        }
+        const stored = await getLocalRecord('extractions', documentRecord.key).catch(() => null);
+        if (!stored) {
+          openingGalleryKey = undefined;
+          documentSetup.hidden = false;
+          pdfStatus.textContent = 'This document has no saved text yet. Extract it again to open the reader.';
+          return;
+        }
         const transfer = new DataTransfer();
         transfer.items.add(currentDocumentFile);
         pdf.files = transfer.files;
-        const stored = await getLocalRecord('extractions', documentRecord.key).catch(() => null);
-        if (stored) {
-          text.value = stored.text || '';
-          preparedParagraphs = stored.paragraphs || [];
-          allPreparedParagraphs = stored.allParagraphs || preparedParagraphs;
-          lastFilterSummary = stored.filterSummary;
-          readDocument.disabled = !preparedParagraphs.length;
-          readerTitle.textContent = documentRecord.fileName;
-          pdfStatus.textContent = 'Opening saved document…';
-          readDocument.click();
-        }
+        // Assigning input.files fires no change event, so the resume record and
+        // its saved reader settings have to be restored here as well.
+        pendingResume = loadDocumentResume();
+        applyResumePreferences(pendingResume);
+        preparedText = stored.text || '';
+        preparedParagraphs = stored.paragraphs || [];
+        allPreparedParagraphs = stored.allParagraphs || preparedParagraphs;
+        lastFilterSummary = stored.filterSummary;
+        readerTitle.textContent = documentRecord.fileName;
+        pdfStatus.textContent = 'Opening saved document…';
+        openReader();
+      }
+
+      // The transport button carries its state in its icon and accessible name;
+      // it has no visible label to overwrite.
+      function setPlaybackButton(playing) {
+        readerToggle.querySelector('use').setAttribute('href', playing ? '#i-pause' : '#i-play');
+        readerToggle.setAttribute('aria-label', playing ? 'Pause' : 'Play');
       }
 
       function currentSection(index = readerCurrentIndex) {
@@ -896,7 +1286,11 @@
           const minutes = Math.floor(seconds / 60);
           remaining = ` · ~${minutes ? `${minutes}m ` : ''}${seconds % 60}s left`;
         }
-        readerProgress.textContent = `Paragraph ${readerCurrentIndex + 1} of ${readerItems.length} · ${currentSection()} · ${Math.floor(elapsedSeconds / 60)}m listened${remaining}`;
+        readerProgress.textContent = `Paragraph ${readerCurrentIndex + 1} of ${readerItems.length}`;
+        readerDetail.textContent = `${currentSection()} · ${Math.floor(elapsedSeconds / 60)}m listened${remaining}`;
+        readerProgressFill.style.width = `${((readerCurrentIndex + 1) / readerItems.length) * 100}%`;
+        readerPrev.disabled = readerCurrentIndex <= 0;
+        readerNext.disabled = readerCurrentIndex >= readerItems.length - 1;
       }
 
       function exportItems(scope) {
@@ -923,7 +1317,9 @@
           const response = await fetch('/api/export-audio', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({chunks, speed: readerVoiceSpeed}),
+            // Live playback reaches the chosen speed through the audio element,
+            // so an export has to ask Kokoro for it to sound the same.
+            body: JSON.stringify({chunks, speed: Number(readerPlaybackSpeed.value)}),
             signal: exportAbortController.signal,
           });
           if (!response.ok) {
@@ -967,12 +1363,17 @@
       renderLibrary();
 
       choosePdf.addEventListener('click', () => pdf.click());
-      importCancel.addEventListener('click', () => {
+      importChoose.addEventListener('click', () => pdf.click());
+      function cancelImport() {
         pdf.value = '';
         currentDocumentFile = undefined;
         currentDocumentKey = undefined;
+        openingGalleryKey = undefined;
         documentSetup.hidden = true;
-      });
+      }
+
+      importCancel.addEventListener('click', cancelImport);
+      importClose.addEventListener('click', cancelImport);
       pdf.addEventListener('change', async () => {
         const file = pdf.files[0];
         if (!file) return;
@@ -983,7 +1384,7 @@
         fileName.textContent = file.name;
         documentSetup.hidden = false;
         extract.disabled = false;
-        readDocument.disabled = true;
+        preparedText = '';
         preparedParagraphs = [];
         allPreparedParagraphs = [];
         pdfStatus.textContent = 'Identifying PDF locally to restore its reader settings...';
@@ -993,19 +1394,22 @@
           pendingResume = loadDocumentResume();
           applyResumePreferences(pendingResume);
           if (openingGalleryKey === currentDocumentKey) {
+            openingGalleryKey = undefined;
             const stored = await getLocalRecord('extractions', currentDocumentKey).catch(() => null);
             if (stored) {
-              text.value = stored.text || '';
+              preparedText = stored.text || '';
               preparedParagraphs = stored.paragraphs || [];
               allPreparedParagraphs = stored.allParagraphs || preparedParagraphs;
               lastFilterSummary = stored.filterSummary;
-              readDocument.disabled = !preparedParagraphs.length;
+              readerTitle.textContent = file.name;
+              documentSetup.hidden = true;
               pdfStatus.textContent = 'Opening saved document…';
-              openingGalleryKey = undefined;
-              readDocument.click();
+              await retainPdfInGallery(file);
+              openReader();
               return;
             }
           }
+          openingGalleryKey = undefined;
           pdfStatus.textContent = 'Ready to import. Choose extraction options, then add this PDF to your library.';
         } catch {
           if (selectionVersion === documentSelectionVersion) pdfStatus.textContent = 'PDF selected. Choose extraction options to add it to your library.';
@@ -1161,19 +1565,33 @@
             overlay.style.top = `${((box.page_size.height - box.bbox.t) / box.page_size.height) * 100}%`;
             overlay.style.width = `${((box.bbox.r - box.bbox.l) / box.page_size.width) * 100}%`;
             overlay.style.height = `${((box.bbox.t - box.bbox.b) / box.page_size.height) * 100}%`;
-            overlay.addEventListener('click', () => jumpToSource(paragraph.id));
-            overlay.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); jumpToSource(paragraph.id); } });
+            overlay.addEventListener('click', () => jumpToSource(paragraph.id, {play: true}));
+            overlay.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); jumpToSource(paragraph.id, {play: true}); } });
             const tools = document.createElement('span');
             tools.className = 'paragraph-tools';
-            const addTool = (label, title, action) => {
-              const tool = document.createElement('button'); tool.type = 'button'; tool.textContent = label; tool.title = title;
-              tool.addEventListener('click', event => { event.stopPropagation(); jumpToSource(paragraph.id); action(); });
+            const addTool = (name, icon, label, action) => {
+              const tool = document.createElement('button');
+              tool.type = 'button';
+              tool.dataset.tool = name;
+              tool.title = label;
+              tool.setAttribute('aria-label', label);
+              tool.innerHTML = `<svg><use href="#${icon}"/></svg>`;
+              tool.addEventListener('click', event => { event.stopPropagation(); action(); });
               tools.append(tool);
             };
-            addTool('▶', 'Read from here', () => {});
-            addTool('●', 'Highlight paragraph', () => createHighlight());
-            addTool('✎', 'Add note', () => addNote());
-            overlay.append(tools);
+            addTool('play', 'i-play', 'Read from here', () => toggleParagraphPlayback(paragraph.id));
+            addTool('mark', 'i-mark', 'Highlight paragraph', () => toggleHighlight(paragraph.id));
+            addTool('note', 'i-note', 'Add note', () => addNote(paragraph.id));
+            // Filled in by refreshPdfHighlights, and only shown for paragraphs
+            // that actually carry a note.
+            const noteCard = document.createElement('button');
+            noteCard.type = 'button';
+            noteCard.className = 'paragraph-note';
+            noteCard.title = 'Edit this note';
+            noteCard.hidden = true;
+            noteCard.innerHTML = '<svg><use href="#i-note"/></svg><span class="paragraph-note-text"></span>';
+            noteCard.addEventListener('click', event => { event.stopPropagation(); addNote(paragraph.id); });
+            overlay.append(tools, noteCard);
             pageElement.append(overlay);
           }
           renderedPages.append(pageElement);
@@ -1225,24 +1643,72 @@
         });
       }
 
+      function highlightFor(sourceId) {
+        return readerAnnotations.find(annotation => annotation.sourceId === sourceId);
+      }
+
       function refreshPdfHighlights() {
+        const query = normaliseSearchText(readerSearch.value || '');
+        const currentSourceId = readerItems[readerCurrentIndex]?.sourceId;
         pdfViewer.querySelectorAll('.pdf-paragraph').forEach(overlay => {
-          const sourceItems = readerItems.filter(item => item.sourceId === overlay.dataset.sourceId);
+          const sourceId = overlay.dataset.sourceId;
+          const sourceItems = readerItems.filter(item => item.sourceId === sourceId);
           const statuses = sourceItems.map(statusForItem);
           const status = statuses.includes('playing') ? 'playing'
             : statuses.includes('converting') ? 'converting'
             : statuses.includes('ready') ? 'ready'
             : statuses.length && statuses.every(item => item === 'played') ? 'played' : 'queued';
-          const annotated = readerAnnotations.some(annotation => annotation.sourceId === overlay.dataset.sourceId);
-          const query = normaliseSearchText(readerSearch.value || '');
-          const matching = !query || sourceItems.some(item => normaliseSearchText(item.text).includes(query));
-          overlay.className = `pdf-paragraph status-${status}${annotated ? ' annotated' : ''}${matching ? '' : ' search-filtered'}`;
+          const highlight = highlightFor(sourceId);
+          // A search marks its matches but never hides a paragraph: every
+          // paragraph in the PDF stays visible and clickable.
+          const matching = Boolean(query) && sourceItems.some(item => normaliseSearchText(item.text).includes(query));
+          overlay.className = `pdf-paragraph status-${status}${highlight ? ' annotated' : ''}${matching ? ' search-match' : ''}`;
+          const playing = sourceId === currentSourceId && readerAutoplay;
+          const playTool = overlay.querySelector('[data-tool="play"]');
+          if (playTool) {
+            playTool.querySelector('use').setAttribute('href', playing ? '#i-pause' : '#i-play');
+            playTool.title = playing ? 'Pause' : 'Read from here';
+            playTool.setAttribute('aria-label', playTool.title);
+          }
+          const markTool = overlay.querySelector('[data-tool="mark"]');
+          if (markTool) {
+            markTool.classList.toggle('is-on', Boolean(highlight));
+            markTool.title = highlight ? 'Remove highlight' : 'Highlight paragraph';
+            markTool.setAttribute('aria-label', markTool.title);
+          }
+          const noteTool = overlay.querySelector('[data-tool="note"]');
+          if (noteTool) {
+            noteTool.classList.toggle('is-on', Boolean(highlight?.note));
+            noteTool.title = highlight?.note ? 'Edit note' : 'Add note';
+            noteTool.setAttribute('aria-label', noteTool.title);
+          }
+          const noteCard = overlay.querySelector('.paragraph-note');
+          if (noteCard) {
+            noteCard.hidden = !highlight?.note;
+            if (highlight?.note) {
+              noteCard.querySelector('.paragraph-note-text').textContent = highlight.note;
+              noteCard.setAttribute('aria-label', `Edit note: ${highlight.note.slice(0, 80)}`);
+            }
+          }
         });
+        const currentHighlight = currentSourceId ? highlightFor(currentSourceId) : undefined;
+        readerHighlightToggle.classList.toggle('is-on', Boolean(currentHighlight));
+        readerHighlightToggle.lastChild.textContent = currentHighlight ? 'Highlighted' : 'Highlight';
       }
 
-      function jumpToSource(sourceId) {
+      function jumpToSource(sourceId, options) {
         const index = readerItems.findIndex(item => item.sourceId === sourceId && statusForItem(item) !== 'played');
-        jumpToParagraph(index >= 0 ? index : readerItems.findIndex(item => item.sourceId === sourceId));
+        jumpToParagraph(index >= 0 ? index : readerItems.findIndex(item => item.sourceId === sourceId), options);
+      }
+
+      // Clicking the transport on the paragraph that is already loaded should
+      // behave like the main play button rather than restarting it.
+      function toggleParagraphPlayback(sourceId) {
+        if (readerItems[readerCurrentIndex]?.sourceId === sourceId && readerPlayer.src) {
+          toggleReaderPlayback();
+          return;
+        }
+        jumpToSource(sourceId, {play: true});
       }
 
       function statusForItem(item) {
@@ -1253,24 +1719,6 @@
         if (states.includes('ready')) return 'ready';
         if (states.includes('error')) return 'error';
         return 'queued';
-      }
-
-      function renderTranscript() {
-        transcript.replaceChildren();
-        readerItems.forEach((item, index) => {
-          const element = document.createElement('button');
-          element.type = 'button';
-          element.className = `chunk status-${statusForItem(item)}${index === readerCurrentIndex ? ' active' : ''}`;
-          const meta = document.createElement('span');
-          meta.className = 'chunk-meta';
-          meta.textContent = `Paragraph ${index + 1} - ${statusForItem(item)}`;
-          const body = document.createElement('span');
-          appendHighlightedText(body, item.text, readerSearch.value);
-          element.append(meta, body);
-          element.addEventListener('click', () => jumpToParagraph(index));
-          transcript.append(element);
-        });
-        refreshTranscript();
       }
 
       function appendHighlightedText(container, value, query) {
@@ -1285,12 +1733,19 @@
         );
       }
 
-      function refreshTranscript() {
-        transcript.querySelectorAll('.chunk').forEach((element, index) => {
-          const item = readerItems[index];
-          const status = statusForItem(item);
-          element.className = `chunk status-${status}${index === readerCurrentIndex ? ' active' : ''}`;
-          element.querySelector('.chunk-meta').textContent = `Paragraph ${index + 1} - ${status}`;
+      function paragraphMeta(index) {
+        return `Paragraph ${index + 1} · ${statusForItem(readerItems[index])}`;
+      }
+
+      // Update the open drawer in place rather than rebuilding it: conversion
+      // state changes for every prefetched paragraph, and a rebuild would drop
+      // scroll position and keyboard focus each time.
+      function refreshReaderState() {
+        readerDrawer.querySelectorAll('[data-paragraph-index]').forEach(element => {
+          const index = Number(element.dataset.paragraphIndex);
+          if (!readerItems[index]) return;
+          element.classList.toggle('active', index === readerCurrentIndex);
+          element.querySelector('.drawer-meta').textContent = paragraphMeta(index);
         });
         updateReaderProgress();
         refreshPdfHighlights();
@@ -1298,14 +1753,12 @@
 
       function focusParagraph(index, reveal = false) {
         readerCurrentIndex = index;
-        refreshTranscript();
-        if (reveal) transcript.querySelector('.chunk.active')?.scrollIntoView({block: 'nearest', behavior: 'auto'});
-        if (reveal) pdfViewer.querySelector(`.pdf-paragraph[data-source-id="${readerItems[index]?.sourceId}"]`)?.scrollIntoView({block: 'center', behavior: 'auto'});
+        refreshReaderState();
+        if (reveal) revealParagraph(index);
         saveDocumentResume();
       }
 
       function revealParagraph(index) {
-        transcript.children[index]?.scrollIntoView({block: 'nearest', behavior: 'auto'});
         pdfViewer.querySelector(`.pdf-paragraph[data-source-id="${readerItems[index]?.sourceId}"]`)?.scrollIntoView({block: 'center', behavior: 'auto'});
       }
 
@@ -1348,7 +1801,7 @@
           button.className = 'drawer-item';
           button.style.paddingLeft = `${8 + ((item.depth - 1) * 14)}px`;
           button.textContent = item.text;
-          button.addEventListener('click', () => jumpToParagraph(item.index));
+          button.addEventListener('click', () => jumpToParagraph(item.index, {play: true}));
           return button;
         });
         openDrawer('Outline', items, query ? 'No outline entries match this search.' : 'No section headings were detected in this reading queue.');
@@ -1358,9 +1811,11 @@
         const query = normaliseSearchText(readerSearch.value || '');
         const items = readerItems.flatMap((item, index) => !query || normaliseSearchText(item.text).includes(query) ? [(() => {
           const button = document.createElement('button'); button.type = 'button'; button.className = 'drawer-item';
-          button.textContent = item.text;
-          const meta = document.createElement('span'); meta.className = 'drawer-meta'; meta.textContent = `Paragraph ${index + 1} · Click to prepare`;
-          button.append(meta); button.addEventListener('click', () => jumpToParagraph(index)); return button;
+          appendHighlightedText(button, item.text, readerSearch.value);
+          button.dataset.paragraphIndex = String(index);
+          button.classList.toggle('active', index === readerCurrentIndex);
+          const meta = document.createElement('span'); meta.className = 'drawer-meta'; meta.textContent = paragraphMeta(index);
+          button.append(meta); button.addEventListener('click', () => jumpToParagraph(index, {play: true})); return button;
         })()] : []);
         openDrawer('Text', items, query ? 'No paragraphs match this search.' : 'No imported text is available.');
       }
@@ -1368,18 +1823,41 @@
       function showHighlights() {
         const sourceIndices = new Map(readerItems.map((item, index) => [item.sourceId, index]));
         const query = normaliseSearchText(readerSearch.value || '');
-        const savedPassages = [...readerAnnotations, ...readerBookmarks.filter(bookmark => !readerAnnotations.some(annotation => annotation.sourceId === bookmark.sourceId)).map(bookmark => ({...bookmark, note: bookmark.note || '', legacyBookmark: true}))];
-        const items = savedPassages.filter(annotation => !query || normaliseSearchText(`${annotation.excerpt} ${annotation.note || ''}`).includes(query)).map(annotation => {
+        const items = readerAnnotations.filter(annotation => !query || normaliseSearchText(`${annotation.excerpt} ${annotation.note || ''}`).includes(query)).map(annotation => {
           const button = document.createElement('button');
           button.type = 'button';
-          button.className = 'drawer-item';
+          button.className = `drawer-item passage${annotation.note ? ' has-note' : ''}`;
           const index = sourceIndices.get(annotation.sourceId);
-          button.textContent = annotation.note || annotation.excerpt || 'Highlight';
+
+          // The source text is what makes a note make sense later, so it is
+          // always quoted first and the note reads as a reply to it.
+          const quote = document.createElement('span');
+          quote.className = 'passage-quote';
+          appendHighlightedText(quote, annotation.excerpt || 'Highlighted paragraph', readerSearch.value);
+          button.append(quote);
+
+          if (annotation.note) {
+            const note = document.createElement('span');
+            note.className = 'passage-note';
+            appendHighlightedText(note, annotation.note, readerSearch.value);
+            button.append(note);
+          }
+
           const meta = document.createElement('span');
           meta.className = 'drawer-meta';
-          meta.textContent = index === undefined ? 'Paragraph moved; use the saved excerpt to find it.' : `${annotation.legacyBookmark ? 'Saved passage' : 'Highlight'} · Paragraph ${index + 1}`;
+          const when = annotation.updatedAt ? new Date(annotation.updatedAt) : null;
+          const stamp = when && !Number.isNaN(when.valueOf())
+            ? ` · ${when.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}` : '';
+          meta.textContent = index === undefined
+            ? 'Paragraph moved; use the quote above to find it'
+            : `Paragraph ${index + 1}${stamp}`;
           button.append(meta);
-          button.addEventListener('click', () => { if (index !== undefined) jumpToParagraph(index); });
+
+          // Browsing saved passages only moves the page. Whatever is playing
+          // keeps playing, and the reading position stays where it was.
+          button.addEventListener('click', () => {
+            if (index !== undefined) revealParagraph(index);
+          });
           return button;
         });
         openDrawer('Highlights', items, query ? 'No highlights or notes match this search.' : 'Use Highlight or Add note on a PDF paragraph to save it here.');
@@ -1407,7 +1885,7 @@
         readFromHere.type = 'button';
         readFromHere.className = 'drawer-item';
         readFromHere.textContent = `Read from here: ${result.item.text.slice(0, 180)}`;
-        readFromHere.addEventListener('click', () => jumpToParagraph(result.index));
+        readFromHere.addEventListener('click', () => jumpToParagraph(result.index, {play: true}));
         openDrawer(`Search result ${readerSearchResultIndex + 1} of ${readerSearchResults.length}`, [readFromHere], '');
       }
 
@@ -1429,11 +1907,16 @@
         documentSetup.hidden = true;
         reader.classList.remove('listen-only');
         readerListenOnly.textContent = 'Listen only';
+        exportMenu.open = false;
         readerToggle.disabled = true;
+        setPlaybackButton(false);
+        readerProgressFill.style.width = '0%';
         if (document.fullscreenElement === reader) document.exitFullscreen().catch(() => {});
       }
 
-      function jumpToParagraph(index) {
+      // `play` marks an explicit request to read from here. Keyboard and
+      // media-key navigation omit it so they keep whatever state you were in.
+      function jumpToParagraph(index, {play = false} = {}) {
         if (reader.hidden || index < 0 || index >= readerItems.length) return;
         const previous = readerItems[readerCurrentIndex];
         if (previous?.partStates[previous.partIndex] === 'playing') previous.partStates[previous.partIndex] = 'ready';
@@ -1441,6 +1924,8 @@
         target.partIndex = 0;
         target.partStates = target.partStates.map(state => state === 'played' ? 'ready' : state === 'error' ? 'queued' : state);
         unloadReaderAudio();
+        if (play) readerAutoplay = true;
+        setPlaybackButton(readerAutoplay);
         readerToggle.disabled = true;
         focusParagraph(index);
         readerStatus.textContent = `Preparing paragraph ${index + 1}...`;
@@ -1460,13 +1945,13 @@
         if (itemIndex < 0) return;
         const item = readerItems[itemIndex];
         item.partStates[partIndex] = 'converting';
-        refreshTranscript();
-        synthesize(item.parts[partIndex], readerVoiceSpeed)
+        refreshReaderState();
+        synthesize(item.parts[partIndex], SYNTHESIS_SPEED)
           .then(blob => {
             if (run !== readerRun) return;
             item.blobs[partIndex] = blob;
             item.partStates[partIndex] = 'ready';
-            refreshTranscript();
+            refreshReaderState();
             saveDocumentResume();
             if (itemIndex === readerCurrentIndex && item.partIndex === partIndex) startCurrentParagraph(run);
             pumpConversionQueue(run);
@@ -1475,7 +1960,7 @@
             if (run !== readerRun) return;
             item.partStates[partIndex] = 'error';
             item.error = error.message;
-            refreshTranscript();
+            refreshReaderState();
             if (itemIndex === readerCurrentIndex && item.partIndex === partIndex) {
               readerStatus.textContent = `Paragraph ${itemIndex + 1} failed: ${error.message}`;
               readerToggle.disabled = true;
@@ -1490,8 +1975,13 @@
         const partIndex = item.partIndex;
         const partState = item.partStates[partIndex];
         if (partState === 'queued' || partState === 'converting') {
-          readerStatus.textContent = `Converting paragraph ${readerCurrentIndex + 1}...`;
+          // Audio is not ready yet, but the controls already reflect the
+          // pending intent so a click never looks like it was ignored.
+          readerStatus.textContent = readerAutoplay
+            ? `Converting paragraph ${readerCurrentIndex + 1}; playback starts automatically…`
+            : `Converting paragraph ${readerCurrentIndex + 1}…`;
           readerToggle.disabled = true;
+          setPlaybackButton(readerAutoplay);
           pumpConversionQueue(run);
           return;
         }
@@ -1515,14 +2005,14 @@
           readerCompletedSeconds += (readerPlayer.duration || 0) / Math.max(Number(readerPlaybackSpeed.value), 0.1);
           if (partIndex + 1 < item.parts.length) {
             item.partIndex += 1;
-            refreshTranscript();
+            refreshReaderState();
             saveDocumentResume();
             startCurrentParagraph(run);
             return;
           }
           const nextIndex = readerCurrentIndex + 1;
           if (nextIndex >= readerItems.length) {
-            refreshTranscript();
+            refreshReaderState();
             readerStatus.textContent = 'Finished reading.';
             readerToggle.disabled = true;
             saveDocumentResume();
@@ -1532,14 +2022,14 @@
           startCurrentParagraph(run);
         };
         readerToggle.disabled = false;
-        readerToggle.textContent = readerAutoplay ? 'Pause' : 'Play';
-        refreshTranscript();
+        setPlaybackButton(readerAutoplay);
+        refreshReaderState();
         saveDocumentResume();
         readerStatus.textContent = readerAutoplay ? 'Playing. The conversion queue is preparing upcoming paragraphs.' : 'Ready to play. Upcoming paragraphs will prepare as you listen.';
         pumpConversionQueue(run);
         if (readerAutoplay) readerPlayer.play().catch(() => {
           readerAutoplay = false;
-          readerToggle.textContent = 'Play';
+          setPlaybackButton(false);
           readerStatus.textContent = 'Audio is ready. Press Play to begin reading.';
         });
       }
@@ -1548,7 +2038,6 @@
         const file = pdf.files[0];
         if (!file) { pdfStatus.textContent = 'Choose a PDF first.'; return; }
         extract.disabled = true;
-        readDocument.disabled = true;
         pdfStatus.textContent = `Extracting text from ${file.name}...`;
         try {
           const response = await fetch('/api/extract-pdf', {
@@ -1562,29 +2051,28 @@
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || 'Could not extract the PDF.');
-          text.value = result.text;
+          preparedText = result.text;
           preparedParagraphs = result.paragraphs || [];
           allPreparedParagraphs = result.all_paragraphs || preparedParagraphs;
           lastFilterSummary = result.filter_summary;
           if (currentDocumentKey) {
+            // Store the PDF first: a saved extraction without its document is
+            // an orphan record the gallery can never open.
+            const [stored, thumbnail] = await Promise.all([retainPdfInGallery(file), createPdfThumbnail(file).catch(() => null)]);
+            if (!stored) throw new Error('This browser could not store the PDF in the local gallery.');
             await putLocalRecord('extractions', {
               key: currentDocumentKey, text: result.text, paragraphs: preparedParagraphs,
               allParagraphs: allPreparedParagraphs, filterSummary: lastFilterSummary, updatedAt: new Date().toISOString(),
             });
-            const [stored, thumbnail] = await Promise.all([retainPdfInGallery(file), createPdfThumbnail(file).catch(() => null)]);
-            if (!stored) throw new Error('This browser could not store the PDF in the local gallery.');
             await registerRecentDocument(file, {thumbnail, extraction: {engine: readingOrder.value, preset: extractionPreset.value}});
           }
-          if (pdfUrl) URL.revokeObjectURL(pdfUrl);
           readerTitle.textContent = file.name;
-          readDocument.disabled = !text.value.trim();
-          text.focus();
           const summary = preparedParagraphs.length
             ? filterSummaryMessage(lastFilterSummary)
             : 'Text is ready (this fallback does not expose PDF paragraph geometry).';
           pdfStatus.textContent = `Imported ${file.name}. ${summary}`;
           documentSetup.hidden = true;
-          readDocument.click();
+          openReader();
         } catch (error) {
           pdfStatus.textContent = error.message;
         } finally {
@@ -1592,37 +2080,10 @@
         }
       });
 
-      button.addEventListener('click', async () => {
-        const value = text.value.trim();
-        if (!value) { status.textContent = 'Enter some text first.'; status.className = 'error'; return; }
-        if (value.length > 4000) { status.textContent = 'Use Read full screen for documents longer than 4,000 characters.'; status.className = 'error'; return; }
-        button.disabled = true;
-        status.textContent = 'Generating audio locally...';
-        status.className = '';
-        try {
-          if (audioUrl) URL.revokeObjectURL(audioUrl);
-          audioUrl = URL.createObjectURL(await synthesize(value, Number(speed.value)));
-          player.src = audioUrl;
-          player.classList.add('ready');
-          await player.play().catch(() => {});
-          status.textContent = 'Ready - use the player controls to listen or download.';
-        } catch (error) {
-          status.textContent = error.message;
-          status.className = 'error';
-        } finally {
-          button.disabled = false;
-        }
-      });
-
-      readDocument.addEventListener('click', async () => {
-        const value = text.value.trim();
+      async function openReader() {
+        const value = preparedText.trim();
         if (!pdf.files[0] || !value) {
           pdfStatus.textContent = 'Choose and extract a PDF before opening the reader.';
-          return;
-        }
-        const rate = Number(speed.value);
-        if (!Number.isFinite(rate) || rate < 0.5 || rate > 2) {
-          pdfStatus.textContent = 'Choose a speed between 0.5 and 2.0 before starting the reader.';
           return;
         }
         const paragraphs = preparedParagraphs.length
@@ -1633,7 +2094,6 @@
         readerRun += 1;
         const run = readerRun;
         readerAutoplay = false;
-        readerVoiceSpeed = rate;
         readerItems = paragraphs.map(paragraph => {
           const speechText = textForSpeech(paragraph.text);
           const parts = splitForSpeech(speechText);
@@ -1651,7 +2111,7 @@
         readerSearchNext.disabled = true;
         readerDrawer.hidden = true;
         buildOutline();
-        readerBookmark.disabled = !currentDocumentKey;
+        readerHighlightToggle.disabled = !currentDocumentKey;
         readerText.disabled = false;
         readerAnnotate.disabled = !currentDocumentKey;
         readerHighlightsButton.disabled = !currentDocumentKey;
@@ -1661,10 +2121,9 @@
         readerExportDocument.disabled = false;
         if (currentDocumentKey) {
           try {
-            readerBookmarks = await listBookmarks();
             readerAnnotations = await listSourceLinkedRecords('annotations');
-          } catch { readerBookmarks = []; readerAnnotations = []; }
-        } else { readerBookmarks = []; readerAnnotations = []; }
+          } catch { readerAnnotations = []; }
+        } else { readerAnnotations = []; }
         activateReaderView(readerOutline);
         showOutline();
         readerStatus.textContent = `Opening ${readerItems.length} paragraphs in the advanced reader...`;
@@ -1677,17 +2136,17 @@
           item.partIndex = Math.max(0, Math.min(item.parts.length - 1, Number(pendingResume.speechChunk) || 0));
           readerStatus.textContent = `Resuming paragraph ${readerCurrentIndex + 1}...`;
         }
-        renderTranscript();
         focusParagraph(readerCurrentIndex);
         try {
           await renderPdf(pdf.files[0], preparedParagraphs);
           startCurrentParagraph(run);
+          revealParagraph(readerCurrentIndex);
           pendingResume = undefined;
         } catch (error) {
           readerStatus.textContent = `PDF rendering failed: ${error.message}`;
           readerToggle.disabled = true;
         }
-      });
+      }
 
       readerPlaybackSpeed.addEventListener('input', () => {
         const rate = Number(readerPlaybackSpeed.value);
@@ -1723,15 +2182,16 @@
 
       function toggleReaderPlayback() {
         if (readerToggle.disabled) return;
-        if (readerPlayer.paused) { readerAutoplay = true; readerPlayer.play(); readerToggle.textContent = 'Pause'; }
-        else { readerAutoplay = false; readerPlayer.pause(); readerToggle.textContent = 'Play'; readerStatus.textContent = 'Paused.'; }
+        if (readerPlayer.paused) { readerAutoplay = true; readerPlayer.play().catch(() => {}); setPlaybackButton(true); readerStatus.textContent = 'Playing.'; }
+        else { readerAutoplay = false; readerPlayer.pause(); setPlaybackButton(false); readerStatus.textContent = 'Paused.'; }
+        refreshPdfHighlights();
       }
 
       readerToggle.addEventListener('click', toggleReaderPlayback);
       readerClose.addEventListener('click', stopReader);
       readerOutline.addEventListener('click', () => { activateReaderView(readerOutline); showOutline(); });
       readerText.addEventListener('click', () => { activateReaderView(readerText); showText(); });
-      readerBookmark.addEventListener('click', () => createHighlight().catch(error => { readerStatus.textContent = error.message; }));
+      readerHighlightToggle.addEventListener('click', () => toggleHighlight().catch(error => { readerStatus.textContent = error.message; }));
       readerHighlightsButton.addEventListener('click', () => { activateReaderView(readerHighlightsButton); showHighlights(); });
       readerSearch.addEventListener('input', updateSearchResults);
       readerSearchNext.addEventListener('click', () => moveSearchResult(1));
@@ -1741,14 +2201,18 @@
         reader.classList.toggle('listen-only');
         readerListenOnly.textContent = reader.classList.contains('listen-only') ? 'Show reader' : 'Listen only';
       });
-      readerLocalAssist.addEventListener('click', configureLocalAssistance);
-      keepOffline.addEventListener('click', keepOfflineCopy);
       newCollection.addEventListener('click', createCollection);
       clearLibrary.addEventListener('click', clearAllLibraryData);
-      readerExportParagraph.addEventListener('click', () => exportAudio('paragraph'));
-      readerExportSection.addEventListener('click', () => exportAudio('section'));
-      readerExportDocument.addEventListener('click', () => exportAudio('document'));
+      readerPrev.addEventListener('click', () => jumpToParagraph(readerCurrentIndex - 1));
+      readerNext.addEventListener('click', () => jumpToParagraph(readerCurrentIndex + 1));
+      readerExportParagraph.addEventListener('click', () => { exportMenu.open = false; exportAudio('paragraph'); });
+      readerExportSection.addEventListener('click', () => { exportMenu.open = false; exportAudio('section'); });
+      readerExportDocument.addEventListener('click', () => { exportMenu.open = false; exportAudio('document'); });
       readerExportCancel.addEventListener('click', () => exportAbortController?.abort());
+      // A <details> menu stays open until something closes it.
+      document.addEventListener('click', event => {
+        if (exportMenu.open && !exportMenu.contains(event.target)) exportMenu.open = false;
+      });
       readerHelp.addEventListener('click', () => { readerHelpDialog.hidden = false; readerHelpClose.focus(); });
       readerHelpClose.addEventListener('click', () => { readerHelpDialog.hidden = true; readerHelp.focus(); });
       document.addEventListener('keydown', event => {
