@@ -156,8 +156,8 @@
       #reader-status { padding: 0 14px 10px; }
       #transcript { display: none; }
       .pdf-paragraph { overflow: visible; }
-      .paragraph-tools { position: absolute; z-index: 3; top: 2px; right: 2px; display: flex; gap: 3px; padding: 3px; border-radius: 8px; background: #251d30e8; box-shadow: 0 4px 15px #0006; opacity: 0; transform: scale(.94); transform-origin: top right; transition: opacity .15s, transform .15s; pointer-events: none; }
-      .pdf-paragraph:hover .paragraph-tools, .pdf-paragraph:focus-within .paragraph-tools { opacity: 1; transform: scale(1); pointer-events: auto; }
+      .paragraph-tools { position: absolute; z-index: 3; right: 0; bottom: calc(100% - 4px); display: flex; gap: 3px; padding: 3px; border-radius: 8px; background: #251d30e8; box-shadow: 0 4px 15px #0006; opacity: 0; transition: opacity .15s; pointer-events: none; }
+      .pdf-paragraph:hover .paragraph-tools, .pdf-paragraph:focus-within .paragraph-tools { opacity: 1; pointer-events: auto; }
       .paragraph-tools button { min-height: 25px; min-width: 25px; padding: 0 6px; border-radius: 5px; background: #47365b; color: #fff; font-size: .74rem; }
       #entry-dialog { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 24px; background: #0008; }
       #entry-dialog[hidden] { display: none; }
