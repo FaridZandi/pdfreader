@@ -46,6 +46,10 @@ In the full-page reader, use `Space` to play/pause, `J`/`K` to move between para
 
 The reader derives a section outline from Docling titles and section headers, and searches the current reading queue entirely in the browser. Search results scroll to their source PDF paragraph and offer an explicit **Read from here** action. **Bookmarks** store only the PDF digest, source paragraph id, optional note, timestamp, and a short recovery excerpt in the browser's IndexedDB database; no source PDF is copied there. If an extraction later changes its paragraph ids, the saved excerpt is offered as a local search query instead of silently moving the bookmark.
 
+The **Local library** keeps metadata such as a file name, page count, last-opened time, position, and collection membership in IndexedDB. It does not retain PDFs by default: a recent entry asks you to reselect its file. **Keep offline copy** is an explicit opt-in; it asks the browser for persistent storage when available, checks quota before saving, and labels stored files separately. The library provides per-document and whole-library deletion, plus collections that can be renamed or deleted without deleting the documents, bookmarks, or notes they contain.
+
+The reader can export the current paragraph, current section, or full reading queue as a WAV. Export runs only when requested, honors the current Kokoro voice speed and bracket-skipping option, and can be cancelled from the browser while generation is in progress. It is capped at 250,000 spoken characters per export and 4,000 characters per internal speech chunk.
+
 ## Development workflow
 
 ```bash

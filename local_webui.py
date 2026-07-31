@@ -32,6 +32,7 @@ STATIC_ROOT = ROOT / "webui_static"
 DOCLING = Path(sys.executable).with_name("docling")
 SAMPLE_RATE = 24_000
 MAX_TEXT_LENGTH = 4_000
+MAX_EXPORT_CHARACTERS = 250_000
 MAX_PDF_SIZE = 50 * 1024 * 1024
 READING_ORDERS = {"docling", "docling_no_ocr", "source", "columns"}
 EXTRACTION_PRESETS = {"prose", "prose_captions", "full"}
@@ -409,16 +410,24 @@ class KokoroApp:
         self.lock = threading.Lock()
 
     def synthesize(self, text: str, speed: float) -> bytes:
+        return to_wav(self._synthesize_chunks([text], speed))
+
+    def synthesize_export(self, chunks_to_speak: list[str], speed: float) -> bytes:
+        """Generate one WAV from an explicit, client-selected reading queue."""
+        return to_wav(self._synthesize_chunks(chunks_to_speak, speed))
+
+    def _synthesize_chunks(self, chunks_to_speak: list[str], speed: float) -> np.ndarray:
         chunks: list[np.ndarray] = []
         # Serializing inference prevents simultaneous browser requests competing
         # for the same model instance and system memory.
         with self.lock:
-            for result in self.pipeline(text, voice="af_heart", speed=speed):
-                if result.audio is not None:
-                    chunks.append(result.audio.numpy())
+            for text in chunks_to_speak:
+                for result in self.pipeline(text, voice="af_heart", speed=speed):
+                    if result.audio is not None:
+                        chunks.append(result.audio.numpy())
         if not chunks:
             raise ValueError("Kokoro did not produce audio for that text.")
-        return to_wav(np.concatenate(chunks))
+        return np.concatenate(chunks)
 
     def extract_pdf(self, pdf: bytes, reading_order: str, preset: str) -> dict[str, object]:
         """Extract text from a user PDF without retaining the uploaded file."""
@@ -473,6 +482,9 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
             if self.path == "/api/extract-pdf":
                 self._extract_pdf()
                 return
+            if self.path == "/api/export-audio":
+                self._export_audio()
+                return
             if self.path != "/api/synthesize":
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
@@ -501,6 +513,37 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
 
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "audio/wav")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _export_audio(self) -> None:
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= MAX_EXPORT_CHARACTERS * 2:
+                    raise ValueError("Export request is too large.")
+                payload = json.loads(self.rfile.read(length))
+                chunks = [str(item).strip() for item in payload.get("chunks", [])]
+                if not chunks or any(not item or len(item) > MAX_TEXT_LENGTH for item in chunks):
+                    raise ValueError("Export chunks must contain 1 to 4,000 characters each.")
+                if sum(map(len, chunks)) > MAX_EXPORT_CHARACTERS:
+                    raise ValueError("Export is limited to 250,000 characters at a time.")
+                speed = float(payload.get("speed", 1.0))
+                if not 0.5 <= speed <= 2.0:
+                    raise ValueError("Speed must be between 0.5 and 2.0.")
+                body = app.synthesize_export(chunks, speed)
+            except (ValueError, json.JSONDecodeError) as error:
+                self.log_error("Invalid export request: %s", error)
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+                return
+            except Exception as error:
+                self.log_error("Export failed: %s", error)
+                self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(error)})
+                return
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "audio/wav")
+            self.send_header("Content-Disposition", 'attachment; filename="pdf-reader-export.wav"')
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()

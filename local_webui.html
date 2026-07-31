@@ -39,6 +39,16 @@
       audio { width: 100%; display: none; }
       audio.ready { display: block; }
       .footnote { margin: 22px 0 0; color: #79737d; font-size: .78rem; }
+      .library { margin-top: 24px; padding-top: 18px; border-top: 1px solid #e4dfe8; }
+      .library-header { display: flex; align-items: center; gap: 8px; }
+      .library-header h2 { flex: 1; margin: 0; font-size: 1rem; }
+      .library-header button, .library-item button { flex: 0 0 auto; min-height: 32px; padding: 0 9px; background: #ebe5fa; color: #482889; font-size: .75rem; }
+      #library-list { display: grid; gap: 8px; margin-top: 10px; }
+      .library-item { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 9px; border: 1px solid #e4dfe8; border-radius: 9px; }
+      .library-item-info { flex: 1; min-width: 0; }
+      .library-item-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .84rem; font-weight: 650; }
+      .library-item-meta { color: #79737d; font-size: .72rem; }
+      .library-empty { margin: 8px 0 0; color: #79737d; font-size: .8rem; }
 
       #reader { position: fixed; inset: 0; z-index: 10; display: grid; grid-template-rows: auto minmax(0, 1fr); background: #17131d; color: #f5eff8; }
       #reader[hidden] { display: none !important; }
@@ -150,6 +160,16 @@
       </div>
       <p id="status" role="status"></p>
       <audio id="player" controls></audio>
+      <section class="library" aria-labelledby="library-title">
+        <div class="library-header">
+          <h2 id="library-title">Local library</h2>
+          <button id="keep-offline" type="button" disabled>Keep offline copy</button>
+          <button id="new-collection" type="button">New collection</button>
+          <button id="clear-library" type="button">Clear library</button>
+        </div>
+        <div id="library-list"><p class="library-empty">Recent PDFs will appear here. Files are not kept unless you explicitly save an offline copy.</p></div>
+        <div id="collection-list"></div>
+      </section>
       <p class="footnote">PDF text and audio are processed on this Mac and are not sent to a remote service.</p>
     </main>
 
@@ -179,6 +199,10 @@
             <button id="reader-outline" type="button" disabled>Outline</button>
             <button id="reader-bookmark" type="button" disabled>Bookmark</button>
             <button id="reader-bookmarks" type="button" disabled>Bookmarks</button>
+            <button id="reader-export-paragraph" type="button" disabled>Export paragraph</button>
+            <button id="reader-export-section" type="button" disabled>Export section</button>
+            <button id="reader-export-document" type="button" disabled>Export document</button>
+            <button id="reader-export-cancel" type="button" hidden>Cancel export</button>
           </div>
           <div class="reader-search">
             <input id="reader-search" type="search" placeholder="Search this reading queue" aria-label="Search this reading queue">
@@ -247,6 +271,15 @@
       const readerSearchNext = document.querySelector('#reader-search-next');
       const readerSearchCount = document.querySelector('#reader-search-count');
       const readerDrawer = document.querySelector('#reader-drawer');
+      const keepOffline = document.querySelector('#keep-offline');
+      const newCollection = document.querySelector('#new-collection');
+      const clearLibrary = document.querySelector('#clear-library');
+      const libraryList = document.querySelector('#library-list');
+      const collectionList = document.querySelector('#collection-list');
+      const readerExportParagraph = document.querySelector('#reader-export-paragraph');
+      const readerExportSection = document.querySelector('#reader-export-section');
+      const readerExportDocument = document.querySelector('#reader-export-document');
+      const readerExportCancel = document.querySelector('#reader-export-cancel');
       let audioUrl;
       let pdfUrl;
       let preparedParagraphs = [];
@@ -262,6 +295,8 @@
       let readerSessionStartedAt = 0;
       let readerCompletedCharacters = 0;
       let readerCompletedSeconds = 0;
+      let currentDocumentFile;
+      let exportAbortController;
       let pdfjsLib;
       let pdfDocument;
       let pdfSourceFile;
@@ -325,6 +360,11 @@
             zoom: pdfScale,
             updatedAt: new Date().toISOString(),
           }));
+          if (currentDocumentFile) {
+            registerRecentDocument(currentDocumentFile, {
+              progress: {sourceId: item.sourceId, paragraphIndex: readerCurrentIndex, totalParagraphs: readerItems.length},
+            }).catch(() => {});
+          }
         } catch { /* Storage is optional. */ }
       }
 
@@ -400,12 +440,26 @@
       function openReaderDatabase() {
         return new Promise((resolve, reject) => {
           if (!window.indexedDB) { reject(new Error('IndexedDB is unavailable in this browser.')); return; }
-          const request = indexedDB.open('pdfreader', 1);
+          const request = indexedDB.open('pdfreader', 2);
           request.onupgradeneeded = () => {
             const database = request.result;
             if (!database.objectStoreNames.contains('bookmarks')) {
               const store = database.createObjectStore('bookmarks', {keyPath: 'id'});
               store.createIndex('documentKey', 'documentKey', {unique: false});
+            }
+            if (!database.objectStoreNames.contains('documents')) {
+              database.createObjectStore('documents', {keyPath: 'key'});
+            }
+            if (!database.objectStoreNames.contains('offlineFiles')) {
+              database.createObjectStore('offlineFiles', {keyPath: 'key'});
+            }
+            if (!database.objectStoreNames.contains('collections')) {
+              database.createObjectStore('collections', {keyPath: 'id'});
+            }
+            if (!database.objectStoreNames.contains('documentCollections')) {
+              const store = database.createObjectStore('documentCollections', {keyPath: 'id'});
+              store.createIndex('documentKey', 'documentKey', {unique: false});
+              store.createIndex('collectionId', 'collectionId', {unique: false});
             }
           };
           request.onsuccess = () => resolve(request.result);
@@ -454,6 +508,199 @@
         } catch (error) { readerStatus.textContent = error.message; }
       }
 
+      async function putLocalRecord(storeName, record) {
+        const database = await openReaderDatabase();
+        try {
+          await new Promise((resolve, reject) => {
+            const request = database.transaction(storeName, 'readwrite').objectStore(storeName).put(record);
+            request.onsuccess = resolve;
+            request.onerror = () => reject(request.error);
+          });
+        } finally { database.close(); }
+      }
+
+      async function registerRecentDocument(file, changes = {}) {
+        if (!currentDocumentKey) return;
+        const existing = await getLocalRecord('documents', currentDocumentKey) || {};
+        await putLocalRecord('documents', {
+          ...existing,
+          ...changes,
+          key: currentDocumentKey,
+          fileName: file.name,
+          fileSize: file.size,
+          lastOpenedAt: new Date().toISOString(),
+          offline: changes.offline ?? Boolean(existing.offline),
+        });
+        renderLibrary();
+      }
+
+      async function getLocalRecord(storeName, key) {
+        const database = await openReaderDatabase();
+        try {
+          return await new Promise((resolve, reject) => {
+            const request = database.transaction(storeName, 'readonly').objectStore(storeName).get(key);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+        } finally { database.close(); }
+      }
+
+      async function allLocalRecords(storeName) {
+        const database = await openReaderDatabase();
+        try {
+          return await new Promise((resolve, reject) => {
+            const request = database.transaction(storeName, 'readonly').objectStore(storeName).getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+        } finally { database.close(); }
+      }
+
+      async function keepOfflineCopy() {
+        if (!currentDocumentKey || !currentDocumentFile) return;
+        keepOffline.disabled = true;
+        try {
+          const persisted = await navigator.storage?.persist?.();
+          const estimate = await navigator.storage?.estimate?.();
+          if (estimate?.quota && estimate.quota - (estimate.usage || 0) < currentDocumentFile.size) {
+            throw new Error('Browser storage quota is too small for this offline PDF.');
+          }
+          await putLocalRecord('offlineFiles', {key: currentDocumentKey, file: currentDocumentFile});
+          await registerRecentDocument(currentDocumentFile, {offline: true, storagePersistent: Boolean(persisted)});
+          pdfStatus.textContent = 'Offline copy saved in this browser. It remains local to this browser profile.';
+        } catch (error) { pdfStatus.textContent = error.message || 'Could not save an offline copy.'; }
+        finally { keepOffline.disabled = false; }
+      }
+
+      async function removeDocument(key) {
+        const database = await openReaderDatabase();
+        try {
+          const transaction = database.transaction(['documents', 'offlineFiles', 'bookmarks', 'documentCollections'], 'readwrite');
+          transaction.objectStore('documents').delete(key);
+          transaction.objectStore('offlineFiles').delete(key);
+          const deleteMatching = storeName => {
+            const index = transaction.objectStore(storeName).index('documentKey');
+            index.openCursor(IDBKeyRange.only(key)).onsuccess = event => {
+              const cursor = event.target.result;
+              if (!cursor) return;
+              cursor.delete(); cursor.continue();
+            };
+          };
+          deleteMatching('bookmarks');
+          deleteMatching('documentCollections');
+          await new Promise((resolve, reject) => { transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); });
+        } finally { database.close(); }
+        renderLibrary();
+      }
+
+      async function openOfflineDocument(key) {
+        const stored = await getLocalRecord('offlineFiles', key);
+        if (!stored?.file) return;
+        const transfer = new DataTransfer();
+        transfer.items.add(stored.file);
+        pdf.files = transfer.files;
+        pdf.dispatchEvent(new Event('change'));
+      }
+
+      async function clearAllLibraryData() {
+        if (!window.confirm('Remove all saved PDF metadata, offline copies, bookmarks, and collections from this browser?')) return;
+        const database = await openReaderDatabase();
+        try {
+          const transaction = database.transaction(['documents', 'offlineFiles', 'bookmarks', 'collections', 'documentCollections'], 'readwrite');
+          ['documents', 'offlineFiles', 'bookmarks', 'collections', 'documentCollections'].forEach(store => transaction.objectStore(store).clear());
+          await new Promise((resolve, reject) => { transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); });
+        } finally { database.close(); }
+        renderLibrary();
+      }
+
+      async function createCollection() {
+        const name = window.prompt('Collection name:');
+        if (!name?.trim()) return;
+        const color = window.prompt('Collection color (hex):', '#7052c9') || '#7052c9';
+        await putLocalRecord('collections', {id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, name: name.trim(), color, order: Date.now(), createdAt: new Date().toISOString()});
+        renderLibrary();
+      }
+
+      async function addCurrentDocumentToCollection() {
+        if (!currentDocumentKey) return;
+        const collections = await allLocalRecords('collections');
+        if (!collections.length) { await createCollection(); return addCurrentDocumentToCollection(); }
+        const name = window.prompt(`Add to collection:\n${collections.map(item => item.name).join('\n')}`);
+        const collection = collections.find(item => item.name === name?.trim());
+        if (!collection) return;
+        await putLocalRecord('documentCollections', {id: `${currentDocumentKey}:${collection.id}`, documentKey: currentDocumentKey, collectionId: collection.id, order: Date.now()});
+        renderLibrary();
+      }
+
+      async function renameCollection(collection) {
+        const name = window.prompt('Collection name:', collection.name);
+        if (!name?.trim()) return;
+        await putLocalRecord('collections', {...collection, name: name.trim()});
+        renderLibrary();
+      }
+
+      async function deleteCollection(collection) {
+        if (!window.confirm(`Delete the “${collection.name}” collection? Documents and notes will remain.`)) return;
+        const database = await openReaderDatabase();
+        try {
+          const transaction = database.transaction(['collections', 'documentCollections'], 'readwrite');
+          transaction.objectStore('collections').delete(collection.id);
+          transaction.objectStore('documentCollections').index('collectionId').openCursor(IDBKeyRange.only(collection.id)).onsuccess = event => {
+            const cursor = event.target.result;
+            if (!cursor) return;
+            cursor.delete(); cursor.continue();
+          };
+          await new Promise((resolve, reject) => { transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); });
+        } finally { database.close(); }
+        renderLibrary();
+      }
+
+      async function renderLibrary() {
+        try {
+          const [documents, collections, memberships] = await Promise.all([
+            allLocalRecords('documents'), allLocalRecords('collections'), allLocalRecords('documentCollections'),
+          ]);
+          const collectionById = new Map(collections.map(item => [item.id, item]));
+          libraryList.replaceChildren();
+          collectionList.replaceChildren();
+          if (collections.length) {
+            const title = document.createElement('p'); title.className = 'library-empty'; title.textContent = 'Collections'; collectionList.append(title);
+            collections.sort((a, b) => a.order - b.order).forEach(collection => {
+              const item = document.createElement('div'); item.className = 'library-item';
+              const info = document.createElement('div'); info.className = 'library-item-info';
+              const name = document.createElement('div'); name.className = 'library-item-name'; name.textContent = collection.name;
+              const meta = document.createElement('div'); meta.className = 'library-item-meta'; meta.textContent = 'Documents remain when this collection is deleted.';
+              info.append(name, meta);
+              const rename = document.createElement('button'); rename.type = 'button'; rename.textContent = 'Rename'; rename.addEventListener('click', () => renameCollection(collection));
+              const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Delete'; remove.addEventListener('click', () => deleteCollection(collection));
+              item.append(info, rename, remove); collectionList.append(item);
+            });
+          }
+          if (!documents.length) {
+            libraryList.innerHTML = '<p class="library-empty">Recent PDFs will appear here. Files are not kept unless you explicitly save an offline copy.</p>';
+            return;
+          }
+          documents.sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt)).forEach(documentRecord => {
+            const item = document.createElement('div'); item.className = 'library-item';
+            const info = document.createElement('div'); info.className = 'library-item-info';
+            const name = document.createElement('div'); name.className = 'library-item-name'; name.textContent = documentRecord.fileName;
+            const meta = document.createElement('div'); meta.className = 'library-item-meta';
+            const tags = memberships.filter(item => item.documentKey === documentRecord.key).map(item => collectionById.get(item.collectionId)?.name).filter(Boolean);
+            meta.textContent = `${documentRecord.offline ? 'Offline copy' : 'Reselect file to open'} · ${documentRecord.pageCount || '?'} pages${tags.length ? ` · ${tags.join(', ')}` : ''}`;
+            info.append(name, meta);
+            const collect = document.createElement('button'); collect.type = 'button'; collect.textContent = '+'; collect.title = 'Add current document to a collection';
+            collect.disabled = documentRecord.key !== currentDocumentKey;
+            collect.addEventListener('click', addCurrentDocumentToCollection);
+            const open = document.createElement('button'); open.type = 'button'; open.textContent = 'Open';
+            open.disabled = !documentRecord.offline;
+            open.title = documentRecord.offline ? 'Open the saved offline PDF' : 'Reselect the original PDF to open it';
+            open.addEventListener('click', () => openOfflineDocument(documentRecord.key));
+            const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Delete'; remove.addEventListener('click', () => removeDocument(documentRecord.key));
+            item.append(info, collect, open, remove); libraryList.append(item);
+          });
+        } catch { /* Library storage is optional. */ }
+      }
+
       function currentSection(index = readerCurrentIndex) {
         for (let itemIndex = index; itemIndex >= 0; itemIndex -= 1) {
           const item = readerItems[itemIndex];
@@ -479,6 +726,52 @@
         readerProgress.textContent = `Paragraph ${readerCurrentIndex + 1} of ${readerItems.length} · ${currentSection()} · ${Math.floor(elapsedSeconds / 60)}m listened${remaining}`;
       }
 
+      function exportItems(scope) {
+        if (scope === 'paragraph') return readerItems.slice(readerCurrentIndex, readerCurrentIndex + 1);
+        if (scope === 'section') {
+          let start = readerCurrentIndex;
+          while (start > 0 && !['title', 'section_header'].includes(readerItems[start].label)) start -= 1;
+          let end = readerCurrentIndex + 1;
+          while (end < readerItems.length && !['title', 'section_header'].includes(readerItems[end].label)) end += 1;
+          return readerItems.slice(start, end);
+        }
+        return readerItems;
+      }
+
+      async function exportAudio(scope) {
+        const chunks = exportItems(scope).flatMap(item => item.parts).filter(Boolean);
+        if (!chunks.length) return;
+        const controls = [readerExportParagraph, readerExportSection, readerExportDocument];
+        controls.forEach(button => { button.disabled = true; });
+        readerExportCancel.hidden = false;
+        exportAbortController = new AbortController();
+        readerStatus.textContent = `Exporting ${scope} locally (${chunks.length} speech chunks)...`;
+        try {
+          const response = await fetch('/api/export-audio', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({chunks, speed: readerVoiceSpeed}),
+            signal: exportAbortController.signal,
+          });
+          if (!response.ok) {
+            const message = await response.json().catch(() => ({}));
+            throw new Error(message.error || 'Could not export audio.');
+          }
+          const url = URL.createObjectURL(await response.blob());
+          const link = document.createElement('a');
+          link.href = url; link.download = `${readerTitle.textContent.replace(/\.pdf$/i, '')}-${scope}.wav`;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          readerStatus.textContent = 'WAV export downloaded.';
+        } catch (error) {
+          readerStatus.textContent = error.name === 'AbortError' ? 'Audio export cancelled.' : error.message;
+        } finally {
+          exportAbortController = undefined;
+          readerExportCancel.hidden = true;
+          controls.forEach(button => { button.disabled = !readerItems.length; });
+        }
+      }
+
       function loadPreferences() {
         const savedReadingOrder = loadPreference(preferenceKeys.readingOrder);
         if ([...readingOrder.options].some(option => option.value === savedReadingOrder)) {
@@ -498,6 +791,7 @@
       }
 
       loadPreferences();
+      renderLibrary();
 
       choosePdf.addEventListener('click', () => pdf.click());
       pdf.addEventListener('change', async () => {
@@ -505,6 +799,7 @@
         if (!file) return;
         const selectionVersion = ++documentSelectionVersion;
         currentDocumentKey = undefined;
+        currentDocumentFile = file;
         pendingResume = undefined;
         fileName.textContent = file.name;
         extract.disabled = false;
@@ -517,6 +812,10 @@
           if (selectionVersion !== documentSelectionVersion) return;
           pendingResume = loadDocumentResume();
           applyResumePreferences(pendingResume);
+          if (currentDocumentKey) {
+            try { await registerRecentDocument(file); } catch { /* Storage is optional. */ }
+          }
+          keepOffline.disabled = !currentDocumentKey;
           pdfStatus.textContent = pendingResume
             ? 'Previous reading position and settings restored. Click Extract text to prepare this PDF.'
             : 'PDF selected. Click Extract text to prepare it for reading.';
@@ -618,6 +917,9 @@
         if (file !== pdfSourceFile) {
           pdfSourceFile = file;
           pdfDocument = await pdfjsLib.getDocument({data: new Uint8Array(await file.arrayBuffer())}).promise;
+          if (currentDocumentKey) {
+            registerRecentDocument(file, {pageCount: pdfDocument.numPages}).catch(() => {});
+          }
         }
         await renderPdfPages(paragraphs);
       }
@@ -1105,6 +1407,9 @@
         buildOutline();
         readerBookmark.disabled = !currentDocumentKey;
         readerBookmarksButton.disabled = !currentDocumentKey;
+        readerExportParagraph.disabled = false;
+        readerExportSection.disabled = false;
+        readerExportDocument.disabled = false;
         if (currentDocumentKey) {
           try { readerBookmarks = await listBookmarks(); } catch { readerBookmarks = []; }
         } else readerBookmarks = [];
@@ -1179,6 +1484,13 @@
       readerSearch.addEventListener('input', updateSearchResults);
       readerSearchNext.addEventListener('click', () => moveSearchResult(1));
       readerSearchPrev.addEventListener('click', () => moveSearchResult(-1));
+      keepOffline.addEventListener('click', keepOfflineCopy);
+      newCollection.addEventListener('click', createCollection);
+      clearLibrary.addEventListener('click', clearAllLibraryData);
+      readerExportParagraph.addEventListener('click', () => exportAudio('paragraph'));
+      readerExportSection.addEventListener('click', () => exportAudio('section'));
+      readerExportDocument.addEventListener('click', () => exportAudio('document'));
+      readerExportCancel.addEventListener('click', () => exportAbortController?.abort());
       readerHelp.addEventListener('click', () => { readerHelpDialog.hidden = false; readerHelpClose.focus(); });
       readerHelpClose.addEventListener('click', () => { readerHelpDialog.hidden = true; readerHelp.focus(); });
       document.addEventListener('keydown', event => {
