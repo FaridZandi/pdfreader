@@ -8,11 +8,14 @@ import io
 import json
 import os
 import re
+import select
+import socket
 import subprocess
 import sys
 import threading
 import tempfile
 import wave
+from collections.abc import Callable
 from html.parser import HTMLParser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -37,6 +40,10 @@ MAX_PDF_SIZE = 50 * 1024 * 1024
 READING_ORDERS = {"docling", "docling_no_ocr", "source", "columns"}
 EXTRACTION_PRESETS = {"prose", "prose_captions", "full"}
 PROSE_LABELS = {"text", "section_header", "title", "list_item"}
+
+
+class ExportCancelled(Exception):
+    """Raised when the browser drops an export before it finishes generating."""
 
 
 def _normalise_block_text(value: str) -> str:
@@ -436,16 +443,30 @@ class KokoroApp:
     def synthesize(self, text: str, speed: float) -> bytes:
         return to_wav(self._synthesize_chunks([text], speed))
 
-    def synthesize_export(self, chunks_to_speak: list[str], speed: float) -> bytes:
+    def synthesize_export(
+        self,
+        chunks_to_speak: list[str],
+        speed: float,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> bytes:
         """Generate one WAV from an explicit, client-selected reading queue."""
-        return to_wav(self._synthesize_chunks(chunks_to_speak, speed))
+        return to_wav(self._synthesize_chunks(chunks_to_speak, speed, should_stop))
 
-    def _synthesize_chunks(self, chunks_to_speak: list[str], speed: float) -> np.ndarray:
+    def _synthesize_chunks(
+        self,
+        chunks_to_speak: list[str],
+        speed: float,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> np.ndarray:
         chunks: list[np.ndarray] = []
-        # Serializing inference prevents simultaneous browser requests competing
-        # for the same model instance and system memory.
-        with self.lock:
-            for text in chunks_to_speak:
+        for text in chunks_to_speak:
+            if should_stop is not None and should_stop():
+                raise ExportCancelled
+            # Serializing inference prevents simultaneous browser requests
+            # competing for the same model instance and system memory.  The
+            # lock is taken per chunk rather than around the whole batch, so a
+            # long export does not stall the paragraph the reader is waiting on.
+            with self.lock:
                 for result in self.pipeline(text, voice="af_heart", speed=speed):
                     if result.audio is not None:
                         chunks.append(result.audio.numpy())
@@ -558,7 +579,13 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
                 speed = float(payload.get("speed", 1.0))
                 if not 0.5 <= speed <= 2.0:
                     raise ValueError("Speed must be between 0.5 and 2.0.")
-                body = app.synthesize_export(chunks, speed)
+                body = app.synthesize_export(chunks, speed, self._client_gone)
+            except ExportCancelled:
+                # Cancelling in the browser has to stop the work here too, or
+                # the model keeps generating audio nobody will receive.
+                self.log_message("Export cancelled by the browser")
+                self.close_connection = True
+                return
             except (ValueError, json.JSONDecodeError) as error:
                 self.log_error("Invalid export request: %s", error)
                 self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
@@ -595,6 +622,17 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
                 self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(error)})
                 return
             self._send_json(HTTPStatus.OK, content)
+
+        def _client_gone(self) -> bool:
+            """Whether the browser closed the connection, as a cancel does."""
+            try:
+                readable, _, _ = select.select([self.connection], [], [], 0)
+                if not readable:
+                    return False
+                # Readable with nothing to peek at means the peer sent EOF.
+                return not self.connection.recv(1, socket.MSG_PEEK)
+            except OSError:
+                return True
 
         def _send_json(self, status: HTTPStatus, payload: dict[str, object]) -> None:
             body = json.dumps(payload).encode()

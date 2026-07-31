@@ -639,13 +639,32 @@
             zoom: pdfScale,
             updatedAt: new Date().toISOString(),
           }));
-          if (currentDocumentFile) {
-            registerRecentDocument(currentDocumentFile, {
-              extraction: {engine: readingOrder.value, preset: extractionPreset.value},
-              progress: {sourceId: item.sourceId, paragraphIndex: readerCurrentIndex, totalParagraphs: readerItems.length},
-            }).catch(() => {});
-          }
+          queueRecentDocumentUpdate({
+            extraction: {engine: readingOrder.value, preset: extractionPreset.value},
+            progress: {sourceId: item.sourceId, paragraphIndex: readerCurrentIndex, totalParagraphs: readerItems.length},
+          });
         } catch { /* Storage is optional. */ }
+      }
+
+      // The resume record above is the durable one and is written immediately.
+      // The gallery's copy is only display metadata, so it is coalesced: this
+      // runs on every paragraph, every conversion, and every drag of the speed
+      // slider, and each write costs an IndexedDB transaction.
+      let pendingRecentChanges;
+      let recentDocumentTimer;
+
+      function queueRecentDocumentUpdate(changes) {
+        pendingRecentChanges = changes;
+        if (recentDocumentTimer) return;
+        recentDocumentTimer = setTimeout(flushRecentDocumentUpdate, 1500);
+      }
+
+      function flushRecentDocumentUpdate() {
+        clearTimeout(recentDocumentTimer);
+        recentDocumentTimer = undefined;
+        const changes = pendingRecentChanges;
+        pendingRecentChanges = undefined;
+        if (changes && currentDocumentFile) registerRecentDocument(currentDocumentFile, changes).catch(() => {});
       }
 
       async function identifyDocument(file) {
@@ -769,7 +788,21 @@
         (name ? entryName : withNote ? entryNote : entryConfirm).focus();
       }
 
-      entryCancel.addEventListener('click', () => { entryDialog.hidden = true; entrySubmit = undefined; });
+      function closeEntryDialog() {
+        entryDialog.hidden = true;
+        entrySubmit = undefined;
+      }
+
+      entryCancel.addEventListener('click', closeEntryDialog);
+      // Captured before every other handler so Escape reaches this dialog from
+      // inside its own text field, and never falls through to the reader's
+      // Escape, which would exit the reader and discard what was typed.
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || entryDialog.hidden) return;
+        event.preventDefault();
+        event.stopPropagation();
+        closeEntryDialog();
+      }, true);
       entryForm.addEventListener('submit', async event => {
         event.preventDefault();
         const submit = entrySubmit;
@@ -870,7 +903,9 @@
           lastOpenedAt: new Date().toISOString(),
           offline: changes.offline ?? Boolean(existing.offline),
         });
-        renderLibrary();
+        // Rebuilding the grid behind the full-screen reader is wasted work;
+        // leaving it renders the gallery from the record just written.
+        if (reader.hidden) renderLibrary();
       }
 
       async function deleteLocalRecord(storeName, key) {
@@ -1565,8 +1600,8 @@
             overlay.style.top = `${((box.page_size.height - box.bbox.t) / box.page_size.height) * 100}%`;
             overlay.style.width = `${((box.bbox.r - box.bbox.l) / box.page_size.width) * 100}%`;
             overlay.style.height = `${((box.bbox.t - box.bbox.b) / box.page_size.height) * 100}%`;
-            overlay.addEventListener('click', () => jumpToSource(paragraph.id, {play: true}));
-            overlay.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); jumpToSource(paragraph.id, {play: true}); } });
+            overlay.addEventListener('click', () => jumpToSource(paragraph.id, {play: true, reveal: false}));
+            overlay.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); jumpToSource(paragraph.id, {play: true, reveal: false}); } });
             const tools = document.createElement('span');
             tools.className = 'paragraph-tools';
             const addTool = (name, icon, label, action) => {
@@ -1650,18 +1685,28 @@
       function refreshPdfHighlights() {
         const query = normaliseSearchText(readerSearch.value || '');
         const currentSourceId = readerItems[readerCurrentIndex]?.sourceId;
+        // Index by source id first. This runs on every conversion state change,
+        // and scanning the queue once per overlay made it quadratic in the
+        // paragraph count.
+        const itemsBySource = new Map();
+        readerItems.forEach(item => {
+          const existing = itemsBySource.get(item.sourceId);
+          if (existing) existing.push(item);
+          else itemsBySource.set(item.sourceId, [item]);
+        });
+        const highlightsBySource = new Map(readerAnnotations.map(annotation => [annotation.sourceId, annotation]));
         pdfViewer.querySelectorAll('.pdf-paragraph').forEach(overlay => {
           const sourceId = overlay.dataset.sourceId;
-          const sourceItems = readerItems.filter(item => item.sourceId === sourceId);
+          const sourceItems = itemsBySource.get(sourceId) || [];
           const statuses = sourceItems.map(statusForItem);
           const status = statuses.includes('playing') ? 'playing'
             : statuses.includes('converting') ? 'converting'
             : statuses.includes('ready') ? 'ready'
             : statuses.length && statuses.every(item => item === 'played') ? 'played' : 'queued';
-          const highlight = highlightFor(sourceId);
+          const highlight = highlightsBySource.get(sourceId);
           // A search marks its matches but never hides a paragraph: every
           // paragraph in the PDF stays visible and clickable.
-          const matching = Boolean(query) && sourceItems.some(item => normaliseSearchText(item.text).includes(query));
+          const matching = Boolean(query) && sourceItems.some(item => item.searchText.includes(query));
           overlay.className = `pdf-paragraph status-${status}${highlight ? ' annotated' : ''}${matching ? ' search-match' : ''}`;
           const playing = sourceId === currentSourceId && readerAutoplay;
           const playTool = overlay.querySelector('[data-tool="play"]');
@@ -1708,7 +1753,7 @@
           toggleReaderPlayback();
           return;
         }
-        jumpToSource(sourceId, {play: true});
+        jumpToSource(sourceId, {play: true, reveal: false});
       }
 
       function statusForItem(item) {
@@ -1809,7 +1854,7 @@
 
       function showText() {
         const query = normaliseSearchText(readerSearch.value || '');
-        const items = readerItems.flatMap((item, index) => !query || normaliseSearchText(item.text).includes(query) ? [(() => {
+        const items = readerItems.flatMap((item, index) => !query || item.searchText.includes(query) ? [(() => {
           const button = document.createElement('button'); button.type = 'button'; button.className = 'drawer-item';
           appendHighlightedText(button, item.text, readerSearch.value);
           button.dataset.paragraphIndex = String(index);
@@ -1865,7 +1910,7 @@
 
       function updateSearchResults() {
         const query = normaliseSearchText(readerSearch.value);
-        readerSearchResults = activeReaderView === 'text' && query ? readerItems.flatMap((item, index) => normaliseSearchText(item.text).includes(query) ? [{index, item}] : []) : [];
+        readerSearchResults = activeReaderView === 'text' && query ? readerItems.flatMap((item, index) => item.searchText.includes(query) ? [{index, item}] : []) : [];
         readerSearchResultIndex = readerSearchResults.length ? 0 : -1;
         readerSearchCount.textContent = `${readerSearchResults.length} result${readerSearchResults.length === 1 ? '' : 's'}`;
         readerSearchPrev.disabled = !readerSearchResults.length;
@@ -1901,8 +1946,18 @@
         saveDocumentResume();
         readerRun += 1;
         unloadReaderAudio();
+        exportAbortController?.abort();
         readerItems = [];
         readerCurrentIndex = -1;
+        // Bump the render version first: a render still walking the page list
+        // would otherwise repopulate the viewer straight after it is cleared.
+        // Every page is a full-resolution canvas, so leaving them behind holds
+        // a lot of memory while you are back in the gallery.
+        pdfRenderVersion += 1;
+        pdfViewer.replaceChildren(Object.assign(document.createElement('p'), {
+          className: 'pdf-loading',
+          textContent: 'The PDF will render here when reading begins.',
+        }));
         reader.hidden = true;
         documentSetup.hidden = true;
         reader.classList.remove('listen-only');
@@ -1912,11 +1967,16 @@
         setPlaybackButton(false);
         readerProgressFill.style.width = '0%';
         if (document.fullscreenElement === reader) document.exitFullscreen().catch(() => {});
+        // The reader is hidden by now, so this both persists the final position
+        // and refreshes the gallery you are returning to.
+        flushRecentDocumentUpdate();
       }
 
       // `play` marks an explicit request to read from here. Keyboard and
       // media-key navigation omit it so they keep whatever state you were in.
-      function jumpToParagraph(index, {play = false} = {}) {
+      // Moving the reading position scrolls the PDF to match, except when the
+      // caller is a click on the paragraph itself, which is already on screen.
+      function jumpToParagraph(index, {play = false, reveal = true} = {}) {
         if (reader.hidden || index < 0 || index >= readerItems.length) return;
         const previous = readerItems[readerCurrentIndex];
         if (previous?.partStates[previous.partIndex] === 'playing') previous.partStates[previous.partIndex] = 'ready';
@@ -1927,7 +1987,7 @@
         if (play) readerAutoplay = true;
         setPlaybackButton(readerAutoplay);
         readerToggle.disabled = true;
-        focusParagraph(index);
+        focusParagraph(index, reveal);
         readerStatus.textContent = `Preparing paragraph ${index + 1}...`;
         saveDocumentResume();
         startCurrentParagraph(readerRun);
@@ -2097,7 +2157,8 @@
         readerItems = paragraphs.map(paragraph => {
           const speechText = textForSpeech(paragraph.text);
           const parts = splitForSpeech(speechText);
-          return { ...paragraph, text: speechText, parts, blobs: Array(parts.length).fill(null), partStates: Array(parts.length).fill('queued'), partIndex: 0 };
+          // Normalised once here rather than per keystroke, per paragraph.
+          return { ...paragraph, text: speechText, searchText: normaliseSearchText(speechText), parts, blobs: Array(parts.length).fill(null), partStates: Array(parts.length).fill('queued'), partIndex: 0 };
         }).filter(item => item.parts.length);
         if (!readerItems.length) return;
         readerSessionStartedAt = Date.now();
@@ -2193,7 +2254,12 @@
       readerText.addEventListener('click', () => { activateReaderView(readerText); showText(); });
       readerHighlightToggle.addEventListener('click', () => toggleHighlight().catch(error => { readerStatus.textContent = error.message; }));
       readerHighlightsButton.addEventListener('click', () => { activateReaderView(readerHighlightsButton); showHighlights(); });
-      readerSearch.addEventListener('input', updateSearchResults);
+      // Each keystroke rebuilds the drawer, so coalesce fast typing.
+      let searchTimer;
+      readerSearch.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(updateSearchResults, 120);
+      });
       readerSearchNext.addEventListener('click', () => moveSearchResult(1));
       readerSearchPrev.addEventListener('click', () => moveSearchResult(-1));
       readerAnnotate.addEventListener('click', () => addNote().catch(error => { readerStatus.textContent = error.message; }));
@@ -2225,7 +2291,8 @@
           else stopReader();
           return;
         }
-        if (!readerHelpDialog.hidden) return;
+        // A dialog owns the keyboard while it is open.
+        if (!readerHelpDialog.hidden || !entryDialog.hidden) return;
         if (event.key === ' ') { event.preventDefault(); toggleReaderPlayback(); return; }
         if (event.key === 'j' || event.key === 'J') { event.preventDefault(); jumpToParagraph(Math.min(readerItems.length - 1, readerCurrentIndex + 1)); return; }
         if (event.key === 'k' || event.key === 'K') { event.preventDefault(); jumpToParagraph(Math.max(0, readerCurrentIndex - 1)); return; }
