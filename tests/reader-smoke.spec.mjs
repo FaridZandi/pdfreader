@@ -60,6 +60,16 @@ test('extracts, starts the reader, jumps, persists resume, and preserves zoom co
     await expect(page.locator('#pdf-status')).toContainText('1 reading paragraphs ready');
     await expect(page.locator('#reader')).toBeVisible();
     await expect(page.getByRole('button', {name: 'Play'})).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Text'})).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Highlights'})).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Review'})).toHaveCount(0);
+    await page.getByRole('button', {name: 'Outline'}).click();
+    await expect(page.locator('#reader-drawer')).toContainText('No section headings were detected');
+    await page.getByRole('button', {name: 'Text'}).click();
+    await expect(page.locator('#reader-drawer')).toContainText('Local reader smoke test.');
+    await page.getByRole('searchbox', {name: 'Search this reading queue'}).fill('no match');
+    await expect(page.locator('#reader-drawer')).toContainText('No paragraphs match this search.');
+    await page.getByRole('searchbox', {name: 'Search this reading queue'}).fill('');
     await expect(page.locator('.pdf-paragraph[data-source-id="p1"]')).toBeVisible();
     await page.locator('.pdf-paragraph[data-source-id="p1"]').click();
     await page.locator('#pdf-viewer').evaluate(viewer => { viewer.scrollTop = 220; });
