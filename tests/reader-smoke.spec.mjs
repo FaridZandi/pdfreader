@@ -56,9 +56,10 @@ test('extracts, starts the reader, jumps, persists resume, and preserves zoom co
   try {
     await page.goto(`http://127.0.0.1:${port}/`);
     await page.locator('#pdf').setInputFiles({name: 'smoke.pdf', mimeType: 'application/pdf', buffer: PDF});
-    await page.getByRole('button', {name: 'Extract and read'}).click();
+    await page.getByRole('button', {name: 'Add and open'}).click();
     await expect(page.locator('#pdf-status')).toContainText('1 reading paragraphs ready');
     await expect(page.locator('#reader')).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Play'})).toBeVisible();
     await expect(page.locator('.pdf-paragraph[data-source-id="p1"]')).toBeVisible();
     await page.locator('.pdf-paragraph[data-source-id="p1"]').click();
     await page.locator('#pdf-viewer').evaluate(viewer => { viewer.scrollTop = 220; });
@@ -68,6 +69,7 @@ test('extracts, starts the reader, jumps, persists resume, and preserves zoom co
     await expect.poll(() => page.locator('#pdf-viewer').evaluate(viewer => viewer.scrollTop)).toBeGreaterThan(scrollBeforeZoom);
     await expect.poll(() => page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('pdfreader.resume.')))).toBe(true);
     await page.getByRole('button', {name: 'Exit reader'}).click();
+    await expect(page.locator('.library-thumbnail')).toBeVisible();
     await expect(page.getByRole('button', {name: 'Open'})).toBeVisible();
     await page.getByRole('button', {name: 'Open'}).click();
     await expect(page.locator('#reader')).toBeVisible();

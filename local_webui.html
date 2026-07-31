@@ -131,7 +131,8 @@
       .library-item-meta { margin-top: 5px; line-height: 1.45; }
       .library-item-actions { display: flex; gap: 6px; margin-top: 14px; }
       .library-item-actions button { min-height: 30px; padding: 0 9px; border-radius: 7px; }
-      .setup-panel { position: sticky; top: 24px; }
+      .setup-panel { position: fixed; z-index: 30; top: 50%; left: 50%; width: min(390px, calc(100vw - 40px)); transform: translate(-50%, -50%); box-shadow: 0 22px 60px #15192744; }
+      .setup-panel::before { content: ''; position: fixed; z-index: -1; inset: -100vmax; background: #17203355; }
       .setup-panel[hidden] { display: none; }
       .setup-panel .pdf-controls { display: grid; grid-template-columns: 1fr; gap: 13px; margin: 18px 0 0; }
       .setup-panel .pdf-controls > div, .setup-panel .order-control, .setup-panel .preset-control { min-width: 0; }
@@ -185,19 +186,19 @@
           <div id="library-list"><p class="library-empty">Add a PDF to start your local library.</p></div>
           <div id="collection-list"></div>
         </section>
-        <section class="setup-panel" id="document-setup" hidden aria-labelledby="setup-title">
-          <h2 id="setup-title">Prepare document</h2>
-          <p id="file-name" class="panel-note">Choose a PDF from your library or add a new one.</p>
+        <section class="setup-panel" id="document-setup" hidden role="dialog" aria-modal="true" aria-labelledby="setup-title">
+          <h2 id="setup-title">Add PDF to your library</h2>
+          <p id="file-name" class="panel-note">Choose extraction options. They will be saved with this imported document.</p>
           <div class="pdf-controls">
             <div class="order-control"><label for="reading-order">Extraction engine</label><select id="reading-order"><option value="docling" selected>Docling text-only</option><option value="docling_no_ocr">Docling text-only (no OCR)</option><option value="source">Preserve source paragraphs</option><option value="columns">Column-aware layout</option></select></div>
             <div class="preset-control"><label for="extraction-preset">Reading preset</label><select id="extraction-preset"><option value="prose" selected>Prose only</option><option value="prose_captions">Prose + captions</option><option value="full">Full document</option></select></div>
-            <button id="extract" type="button" disabled>Extract and read</button>
+            <button id="extract" type="button" disabled>Add and open</button>
           </div>
-          <div class="quick-tools"><button id="keep-offline" class="secondary" type="button" disabled>Stored in gallery</button><button id="clear-library" class="secondary" type="button">Clear library</button></div>
+          <div class="quick-tools"><button id="import-cancel" class="secondary" type="button">Cancel</button></div>
           <p id="pdf-status">Choose a document to prepare it for reading.</p>
         </section>
       </div>
-      <div class="legacy-tts"><textarea id="text"></textarea><input id="speed" value="1"><input id="skip-bracketed-text" type="checkbox"><button id="convert"></button><button id="read-document"></button><audio id="player"></audio><p id="status"></p><button id="new-collection"></button></div>
+      <div class="legacy-tts"><textarea id="text"></textarea><input id="speed" value="1"><input id="skip-bracketed-text" type="checkbox"><button id="convert"></button><button id="read-document"></button><audio id="player"></audio><p id="status"></p><button id="new-collection"></button><button id="keep-offline"></button><button id="clear-library"></button></div>
     </main>
 
     <section id="reader" hidden aria-label="PDF reader">
@@ -280,6 +281,7 @@
       const choosePdf = document.querySelector('#choose-pdf');
       const fileName = document.querySelector('#file-name');
       const documentSetup = document.querySelector('#document-setup');
+      const importCancel = document.querySelector('#import-cancel');
       const extract = document.querySelector('#extract');
       const readingOrder = document.querySelector('#reading-order');
       const extractionPreset = document.querySelector('#extraction-preset');
@@ -353,6 +355,7 @@
       let readerAnnotations = [];
       let entrySubmit;
       let openingGalleryKey;
+      let readerAutoplay = false;
       let pdfjsLib;
       let pdfDocument;
       let pdfSourceFile;
@@ -744,6 +747,18 @@
         } catch { return false; }
       }
 
+      async function createPdfThumbnail(file) {
+        pdfjsLib ||= await import('/static/pdfjs/pdf.mjs');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/pdfjs/pdf.worker.mjs';
+        const pdfDoc = await pdfjsLib.getDocument({data: new Uint8Array(await file.arrayBuffer())}).promise;
+        const page = await pdfDoc.getPage(1);
+        const viewport = page.getViewport({scale: 0.35});
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+        await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+        return canvas.toDataURL('image/jpeg', 0.82);
+      }
+
       async function removeDocument(key) {
         const database = await openReaderDatabase();
         try {
@@ -857,6 +872,13 @@
           }
           documents.sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt)).forEach(documentRecord => {
             const item = document.createElement('div'); item.className = 'library-item';
+            if (documentRecord.thumbnail) {
+              const thumbnail = document.createElement('img'); thumbnail.className = 'library-thumbnail';
+              const url = typeof documentRecord.thumbnail === 'string' ? documentRecord.thumbnail : URL.createObjectURL(documentRecord.thumbnail);
+              thumbnail.src = url;
+              if (typeof documentRecord.thumbnail !== 'string') thumbnail.onload = () => URL.revokeObjectURL(url);
+              item.append(thumbnail);
+            }
             const info = document.createElement('div'); info.className = 'library-item-info';
             const name = document.createElement('div'); name.className = 'library-item-name'; name.textContent = documentRecord.fileName;
             const meta = document.createElement('div'); meta.className = 'library-item-meta';
@@ -994,6 +1016,12 @@
       renderLibrary();
 
       choosePdf.addEventListener('click', () => pdf.click());
+      importCancel.addEventListener('click', () => {
+        pdf.value = '';
+        currentDocumentFile = undefined;
+        currentDocumentKey = undefined;
+        documentSetup.hidden = true;
+      });
       pdf.addEventListener('change', async () => {
         const file = pdf.files[0];
         if (!file) return;
@@ -1013,9 +1041,6 @@
           if (selectionVersion !== documentSelectionVersion) return;
           pendingResume = loadDocumentResume();
           applyResumePreferences(pendingResume);
-          if (currentDocumentKey) {
-            try { await registerRecentDocument(file); } catch { /* Storage is optional. */ }
-          }
           if (openingGalleryKey === currentDocumentKey) {
             const stored = await getLocalRecord('extractions', currentDocumentKey).catch(() => null);
             if (stored) {
@@ -1030,18 +1055,9 @@
               return;
             }
           }
-          keepOffline.textContent = 'Saving to gallery…';
-          keepOffline.disabled = true;
-          const saved = await retainPdfInGallery(file);
-          if (!saved) {
-            keepOffline.textContent = 'Could not store PDF';
-            pdfStatus.textContent = 'PDF selected, but browser storage could not retain a gallery copy. You can still extract it now.';
-          }
-          pdfStatus.textContent = pendingResume
-            ? 'Previous reading position and settings restored. Click Extract text to prepare this PDF.'
-            : 'PDF selected. Click Extract text to prepare it for reading.';
+          pdfStatus.textContent = 'Ready to import. Choose extraction options, then add this PDF to your library.';
         } catch {
-          if (selectionVersion === documentSelectionVersion) pdfStatus.textContent = 'PDF selected. Click Extract text to prepare it for reading.';
+          if (selectionVersion === documentSelectionVersion) pdfStatus.textContent = 'PDF selected. Choose extraction options to add it to your library.';
         }
       });
 
@@ -1460,6 +1476,7 @@
         readerItems = [];
         readerCurrentIndex = -1;
         reader.hidden = true;
+        documentSetup.hidden = true;
         reader.classList.remove('listen-only');
         readerListenOnly.textContent = 'Listen only';
         readerToggle.disabled = true;
@@ -1565,12 +1582,13 @@
           startCurrentParagraph(run);
         };
         readerToggle.disabled = false;
-        readerToggle.textContent = 'Pause';
+        readerToggle.textContent = readerAutoplay ? 'Pause' : 'Play';
         refreshTranscript();
         saveDocumentResume();
-        readerStatus.textContent = 'Playing. The conversion queue is preparing upcoming paragraphs.';
+        readerStatus.textContent = readerAutoplay ? 'Playing. The conversion queue is preparing upcoming paragraphs.' : 'Ready to play. Upcoming paragraphs will prepare as you listen.';
         pumpConversionQueue(run);
-        readerPlayer.play().catch(() => {
+        if (readerAutoplay) readerPlayer.play().catch(() => {
+          readerAutoplay = false;
           readerToggle.textContent = 'Play';
           readerStatus.textContent = 'Audio is ready. Press Play to begin reading.';
         });
@@ -1603,6 +1621,9 @@
               key: currentDocumentKey, text: result.text, paragraphs: preparedParagraphs,
               allParagraphs: allPreparedParagraphs, filterSummary: lastFilterSummary, updatedAt: new Date().toISOString(),
             });
+            const [stored, thumbnail] = await Promise.all([retainPdfInGallery(file), createPdfThumbnail(file).catch(() => null)]);
+            if (!stored) throw new Error('This browser could not store the PDF in the local gallery.');
+            await registerRecentDocument(file, {thumbnail, extraction: {engine: readingOrder.value, preset: extractionPreset.value}});
           }
           if (pdfUrl) URL.revokeObjectURL(pdfUrl);
           readerTitle.textContent = file.name;
@@ -1611,7 +1632,8 @@
           const summary = preparedParagraphs.length
             ? filterSummaryMessage(lastFilterSummary)
             : 'Text is ready (this fallback does not expose PDF paragraph geometry).';
-          pdfStatus.textContent = `Loaded ${file.name}. ${summary} If the text order is wrong, choose a different engine and extract again.`;
+          pdfStatus.textContent = `Imported ${file.name}. ${summary}`;
+          documentSetup.hidden = true;
           readDocument.click();
         } catch (error) {
           pdfStatus.textContent = error.message;
@@ -1660,6 +1682,7 @@
         reader.hidden = false;
         readerRun += 1;
         const run = readerRun;
+        readerAutoplay = false;
         readerVoiceSpeed = rate;
         readerItems = paragraphs.map(paragraph => {
           const speechText = textForSpeech(paragraph.text);
@@ -1751,8 +1774,8 @@
 
       function toggleReaderPlayback() {
         if (readerToggle.disabled) return;
-        if (readerPlayer.paused) { readerPlayer.play(); readerToggle.textContent = 'Pause'; }
-        else { readerPlayer.pause(); readerToggle.textContent = 'Play'; readerStatus.textContent = 'Paused.'; }
+        if (readerPlayer.paused) { readerAutoplay = true; readerPlayer.play(); readerToggle.textContent = 'Pause'; }
+        else { readerAutoplay = false; readerPlayer.pause(); readerToggle.textContent = 'Play'; readerStatus.textContent = 'Paused.'; }
       }
 
       readerToggle.addEventListener('click', toggleReaderPlayback);
