@@ -40,7 +40,7 @@ Choose an **extraction engine** first, then a **reading preset**:
 
 The filter summary explains what was hidden. A filtered block is never deleted from the extraction result, so selecting a broader preset restores it. The square-bracket option is separate: it only omits bracketed text from spoken audio.
 
-When you select a PDF, the browser calculates a SHA-256 digest locally. It uses that digest to store a small resume record in `localStorage`: extraction engine and preset, source paragraph and speech-part position, playback speed, bracket setting, zoom, and update time. The original PDF, its extracted text, and generated audio are not stored by this feature. To remove saved positions, clear this site's local storage in your browser's site-data settings.
+When you select a PDF, the browser calculates a SHA-256 digest locally. It uses that digest to store a small resume record in `localStorage`: extraction engine and preset, source paragraph and speech-part position, playback speed, bracket setting, zoom, and update time. The original PDF, its extracted text, and generated audio are not stored by this feature. Delete an entry or use **Clear library** to remove its saved reader data; clearing this site's local storage also removes resume positions.
 
 In the full-page reader, use `Space` to play/pause, `J`/`K` to move between paragraphs, `[`/`]` to change playback rate, `-`/`=` to zoom, and `Escape` to exit. The **Shortcuts** button shows the same list.
 

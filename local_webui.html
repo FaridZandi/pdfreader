@@ -376,6 +376,7 @@
           }));
           if (currentDocumentFile) {
             registerRecentDocument(currentDocumentFile, {
+              extraction: {engine: readingOrder.value, preset: extractionPreset.value},
               progress: {sourceId: item.sourceId, paragraphIndex: readerCurrentIndex, totalParagraphs: readerItems.length},
             }).catch(() => {});
           }
@@ -659,6 +660,9 @@
         keepOffline.disabled = true;
         try {
           const persisted = await navigator.storage?.persist?.();
+          if (persisted !== true) {
+            throw new Error('Persistent browser storage is unavailable, so this PDF remains metadata-only.');
+          }
           const estimate = await navigator.storage?.estimate?.();
           if (estimate?.quota && estimate.quota - (estimate.usage || 0) < currentDocumentFile.size) {
             throw new Error('Browser storage quota is too small for this offline PDF.');
@@ -690,6 +694,7 @@
           deleteMatching('documentCollections');
           await new Promise((resolve, reject) => { transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); });
         } finally { database.close(); }
+        try { localStorage.removeItem(`pdfreader.resume.${key}`); } catch { /* Storage is optional. */ }
         renderLibrary();
       }
 
@@ -710,6 +715,9 @@
           ['documents', 'offlineFiles', 'bookmarks', 'annotations', 'reviews', 'collections', 'documentCollections'].forEach(store => transaction.objectStore(store).clear());
           await new Promise((resolve, reject) => { transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); });
         } finally { database.close(); }
+        try {
+          Object.keys(localStorage).filter(key => key.startsWith('pdfreader.resume.')).forEach(key => localStorage.removeItem(key));
+        } catch { /* Storage is optional. */ }
         renderLibrary();
       }
 
@@ -757,8 +765,8 @@
 
       async function renderLibrary() {
         try {
-          const [documents, collections, memberships] = await Promise.all([
-            allLocalRecords('documents'), allLocalRecords('collections'), allLocalRecords('documentCollections'),
+          const [documents, collections, memberships, bookmarks] = await Promise.all([
+            allLocalRecords('documents'), allLocalRecords('collections'), allLocalRecords('documentCollections'), allLocalRecords('bookmarks'),
           ]);
           const collectionById = new Map(collections.map(item => [item.id, item]));
           libraryList.replaceChildren();
@@ -786,7 +794,11 @@
             const name = document.createElement('div'); name.className = 'library-item-name'; name.textContent = documentRecord.fileName;
             const meta = document.createElement('div'); meta.className = 'library-item-meta';
             const tags = memberships.filter(item => item.documentKey === documentRecord.key).map(item => collectionById.get(item.collectionId)?.name).filter(Boolean);
-            meta.textContent = `${documentRecord.offline ? 'Offline copy' : 'Reselect file to open'} · ${documentRecord.pageCount || '?'} pages${tags.length ? ` · ${tags.join(', ')}` : ''}`;
+            const bookmarkCount = bookmarks.filter(bookmark => bookmark.documentKey === documentRecord.key).length;
+            const progress = documentRecord.progress?.totalParagraphs
+              ? ` · ${documentRecord.progress.paragraphIndex + 1}/${documentRecord.progress.totalParagraphs}` : '';
+            const opened = documentRecord.lastOpenedAt ? ` · opened ${new Date(documentRecord.lastOpenedAt).toLocaleDateString()}` : '';
+            meta.textContent = `${documentRecord.offline ? 'Offline copy' : 'Available after reselecting'} · ${documentRecord.pageCount || '?'} pages${progress} · ${bookmarkCount} bookmarks${opened}${tags.length ? ` · ${tags.join(', ')}` : ''}`;
             info.append(name, meta);
             const collect = document.createElement('button'); collect.type = 'button'; collect.textContent = '+'; collect.title = 'Add current document to a collection';
             collect.disabled = documentRecord.key !== currentDocumentKey;
