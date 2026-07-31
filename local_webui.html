@@ -193,7 +193,7 @@
             <div class="preset-control"><label for="extraction-preset">Reading preset</label><select id="extraction-preset"><option value="prose" selected>Prose only</option><option value="prose_captions">Prose + captions</option><option value="full">Full document</option></select></div>
             <button id="extract" type="button" disabled>Extract and read</button>
           </div>
-          <div class="quick-tools"><button id="keep-offline" class="secondary" type="button" disabled>Keep offline</button><button id="clear-library" class="secondary" type="button">Clear library</button></div>
+          <div class="quick-tools"><button id="keep-offline" class="secondary" type="button" disabled>Stored in gallery</button><button id="clear-library" class="secondary" type="button">Clear library</button></div>
           <p id="pdf-status">Choose a document to prepare it for reading.</p>
         </section>
       </div>
@@ -352,6 +352,7 @@
       let exportAbortController;
       let readerAnnotations = [];
       let entrySubmit;
+      let openingGalleryKey;
       let pdfjsLib;
       let pdfDocument;
       let pdfSourceFile;
@@ -713,7 +714,7 @@
         try {
           const persisted = await navigator.storage?.persist?.();
           if (persisted !== true) {
-            throw new Error('Persistent browser storage is unavailable, so this PDF remains metadata-only.');
+            throw new Error('Persistent browser storage is unavailable, so this PDF cannot be kept in the gallery.');
           }
           const estimate = await navigator.storage?.estimate?.();
           if (estimate?.quota && estimate.quota - (estimate.usage || 0) < currentDocumentFile.size) {
@@ -724,6 +725,23 @@
           pdfStatus.textContent = 'Offline copy saved in this browser. It remains local to this browser profile.';
         } catch (error) { pdfStatus.textContent = error.message || 'Could not save an offline copy.'; }
         finally { keepOffline.disabled = false; }
+      }
+
+      async function retainPdfInGallery(file) {
+        if (!currentDocumentKey) return false;
+        try {
+          const estimate = await navigator.storage?.estimate?.();
+          if (estimate?.quota && estimate.quota - (estimate.usage || 0) < file.size) return false;
+          // Adding a document is explicit user intent to keep it in this local
+          // gallery. Request persistence when supported, but retain the PDF
+          // even when the browser cannot guarantee it.
+          const persisted = await navigator.storage?.persist?.();
+          await putLocalRecord('offlineFiles', {key: currentDocumentKey, file});
+          await registerRecentDocument(file, {offline: true, storagePersistent: Boolean(persisted)});
+          keepOffline.textContent = 'Stored in gallery';
+          keepOffline.disabled = true;
+          return true;
+        } catch { return false; }
       }
 
       async function removeDocument(key) {
@@ -852,9 +870,9 @@
             const collect = document.createElement('button'); collect.type = 'button'; collect.textContent = '+'; collect.title = 'Add current document to a collection';
             collect.disabled = documentRecord.key !== currentDocumentKey;
             collect.addEventListener('click', addCurrentDocumentToCollection);
-            const open = document.createElement('button'); open.type = 'button'; open.textContent = 'Open';
-            open.title = documentRecord.offline ? 'Open the saved offline PDF' : 'Open saved reading data and select the original PDF when ready';
-            open.addEventListener('click', () => openGalleryDocument(documentRecord));
+            const open = document.createElement('button'); open.type = 'button'; open.textContent = documentRecord.offline ? 'Open' : 'Select original';
+            open.title = documentRecord.offline ? 'Open the saved PDF' : 'Select the original PDF to restore this legacy gallery entry';
+            open.addEventListener('click', () => documentRecord.offline ? openGalleryDocument(documentRecord) : choosePdf.click());
             const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Delete'; remove.addEventListener('click', () => removeDocument(documentRecord.key));
             const actions = document.createElement('div'); actions.className = 'library-item-actions';
             actions.append(open, collect, remove); item.append(info, actions); libraryList.append(item);
@@ -877,7 +895,10 @@
             ? 'Saved extraction ready. Open this PDF in the reader.'
             : 'Saved extraction, bookmarks, and highlights are ready. Select the original PDF to render it again.';
         }
-        if (documentRecord.offline) await openOfflineDocument(documentRecord.key);
+        if (documentRecord.offline) {
+          openingGalleryKey = documentRecord.key;
+          await openOfflineDocument(documentRecord.key);
+        }
       }
 
       function currentSection(index = readerCurrentIndex) {
@@ -995,7 +1016,27 @@
           if (currentDocumentKey) {
             try { await registerRecentDocument(file); } catch { /* Storage is optional. */ }
           }
-          keepOffline.disabled = !currentDocumentKey;
+          if (openingGalleryKey === currentDocumentKey) {
+            const stored = await getLocalRecord('extractions', currentDocumentKey).catch(() => null);
+            if (stored) {
+              text.value = stored.text || '';
+              preparedParagraphs = stored.paragraphs || [];
+              allPreparedParagraphs = stored.allParagraphs || preparedParagraphs;
+              lastFilterSummary = stored.filterSummary;
+              readDocument.disabled = !preparedParagraphs.length;
+              pdfStatus.textContent = 'Opening saved document…';
+              openingGalleryKey = undefined;
+              readDocument.click();
+              return;
+            }
+          }
+          keepOffline.textContent = 'Saving to gallery…';
+          keepOffline.disabled = true;
+          const saved = await retainPdfInGallery(file);
+          if (!saved) {
+            keepOffline.textContent = 'Could not store PDF';
+            pdfStatus.textContent = 'PDF selected, but browser storage could not retain a gallery copy. You can still extract it now.';
+          }
           pdfStatus.textContent = pendingResume
             ? 'Previous reading position and settings restored. Click Extract text to prepare this PDF.'
             : 'PDF selected. Click Extract text to prepare it for reading.';

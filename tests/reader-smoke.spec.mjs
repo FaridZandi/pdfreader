@@ -67,6 +67,10 @@ test('extracts, starts the reader, jumps, persists resume, and preserves zoom co
     await expect(page.locator('#pdf-zoom-value')).toHaveText('140%');
     await expect.poll(() => page.locator('#pdf-viewer').evaluate(viewer => viewer.scrollTop)).toBeGreaterThan(scrollBeforeZoom);
     await expect.poll(() => page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('pdfreader.resume.')))).toBe(true);
+    await page.getByRole('button', {name: 'Exit reader'}).click();
+    await expect(page.getByRole('button', {name: 'Open'})).toBeVisible();
+    await page.getByRole('button', {name: 'Open'}).click();
+    await expect(page.locator('#reader')).toBeVisible();
   } finally {
     await new Promise(resolve => server.close(resolve));
   }
