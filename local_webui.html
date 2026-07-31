@@ -17,11 +17,13 @@
       input, select { padding: 10px; }
       .pdf-controls, .controls { display: flex; align-items: end; gap: 12px; }
       .pdf-controls { margin: 0 0 20px; }
-      .pdf-controls > div { flex: 1; }
-      .order-control { max-width: 195px; }
-      .file-picker { display: flex; align-items: center; gap: 10px; min-height: 43px; }
+      .pdf-controls > div { min-width: 0; }
+      .pdf-controls > div:first-child { flex: 1 1 260px; }
+      .order-control { flex: 0 1 195px; min-width: 155px; }
+      .pdf-controls > #extract { flex: 0 0 auto; padding: 0 16px; }
+      .file-picker { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 43px; }
       #choose-pdf { flex: 0 0 auto; }
-      #file-name { overflow: hidden; color: #635e68; font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
+      #file-name { flex: 1 1 auto; min-width: 0; overflow: hidden; color: #635e68; font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
       .controls { margin-top: 18px; }
       .speed { width: 130px; }
       .skip-brackets { display: flex; align-items: center; gap: 7px; min-height: 43px; margin: 0; white-space: nowrap; }
@@ -49,10 +51,12 @@
       .pdf-page { position: relative; width: max-content; margin: 0 auto 24px; box-shadow: 0 4px 22px #0007; }
       .pdf-page canvas { display: block; }
       button.pdf-paragraph { position: absolute; min-height: 0; border: 1px solid transparent; border-radius: 3px; background: #0000; cursor: pointer; }
-      button.pdf-paragraph:hover { border-color: #a78bf0; background: #a78bf033; }
-      button.pdf-paragraph.status-converting { background: #f5c77633; }
-      button.pdf-paragraph.status-ready, button.pdf-paragraph.status-played { background: #8fdbb026; }
-      button.pdf-paragraph.status-playing { border-color: #ffdf83; background: #f5c77673; box-shadow: 0 0 0 2px #f5c77655; }
+      button.pdf-paragraph:hover { border-color: #a78bf0; background: #a78bf014; }
+      button.pdf-paragraph.status-converting { border-color: #d6a833; border-style: dashed; background: transparent; }
+      button.pdf-paragraph.status-ready, button.pdf-paragraph.status-played { border-color: #6caa8588; background: transparent; }
+      button.pdf-paragraph.status-playing { border-color: transparent; background: transparent; }
+      button.pdf-paragraph.status-playing::before { content: ''; position: absolute; top: -6px; bottom: -6px; left: -13px; width: 5px; border-radius: 999px; background: #6544b8; box-shadow: 0 1px 5px #6544b899; pointer-events: none; }
+      button.pdf-paragraph.status-playing::after { content: ''; position: absolute; inset: -5px; border: 2px solid #6544b8; border-radius: 7px; box-shadow: 0 0 0 4px #6544b820; pointer-events: none; }
       .reader-panel { min-height: 0; display: flex; flex-direction: column; border-left: 1px solid #4d405a; background: #201827; }
       .reader-controls { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid #4d405a; }
       #reader-toggle { flex: 0 0 auto; min-width: 86px; }
@@ -73,7 +77,7 @@
       .status-converting .chunk-meta { color: #f5c776; }
       .status-ready .chunk-meta, .status-played .chunk-meta { color: #8fdbb0; }
       .status-error .chunk-meta { color: #ffaaa4; }
-      @media (max-width: 760px) { .reader-body { grid-template-columns: 1fr; grid-template-rows: minmax(45vh, 1fr) minmax(35vh, 1fr); } .reader-panel { border-left: 0; border-top: 1px solid #4d405a; } }
+      @media (max-width: 760px) { .pdf-controls { flex-wrap: wrap; } .pdf-controls > div:first-child { flex-basis: 100%; } .reader-body { grid-template-columns: 1fr; grid-template-rows: minmax(45vh, 1fr) minmax(35vh, 1fr); } .reader-panel { border-left: 0; border-top: 1px solid #4d405a; } }
       @media (prefers-color-scheme: dark) { body { background: #16131b; color: #eae4ee; } main { background: #24202a; box-shadow: none; } .subtitle, #status { color: #cfc5d2; } textarea, input { border-color: #625b67; } button.secondary { background: #453561; color: #eee6fb; } }
     </style>
   </head>
@@ -132,7 +136,7 @@
           <div class="reader-controls">
             <button id="reader-toggle" type="button" disabled>Pause</button>
             <span id="reader-progress">Preparing reader...</span>
-            <div class="pdf-zoom" aria-label="PDF zoom controls">
+            <div class="pdf-zoom" aria-label="PDF zoom controls" title="Use Command/Ctrl + scroll to zoom around the pointer">
               <button id="pdf-zoom-out" type="button" title="Zoom out">-</button>
               <output id="pdf-zoom-value">125%</output>
               <button id="pdf-zoom-in" type="button" title="Zoom in">+</button>
@@ -184,12 +188,50 @@
       let pdfDocument;
       let pdfSourceFile;
       let pdfScale = 1.25;
+      let pdfRenderVersion = 0;
+      let pdfZoomFrame;
+      let pendingPdfScale;
+      let pendingPdfAnchor;
       let readerRun = 0;
       let readerAudioUrl;
       let readerItems = [];
       let readerCurrentIndex = -1;
       let readerVoiceSpeed = 1;
       const PREFETCH_COUNT = 2;
+      const PDF_MIN_SCALE = 0.75;
+      const PDF_MAX_SCALE = 2.5;
+      // Render once at the maximum supported zoom. CSS then handles every
+      // zoom step immediately without showing an under-resolved page.
+      const PDF_RENDER_SCALE = PDF_MAX_SCALE;
+      const preferenceKeys = {
+        readerPlaybackSpeed: 'pdfreader.reader-playback-speed',
+        skipBracketedText: 'pdfreader.skip-bracketed-text',
+        readingOrder: 'pdfreader.reading-order',
+      };
+
+      function loadPreference(key) {
+        try { return localStorage.getItem(key); } catch { return null; }
+      }
+
+      function savePreference(key, value) {
+        try { localStorage.setItem(key, value); } catch { /* Storage is optional. */ }
+      }
+
+      function loadPreferences() {
+        const savedReadingOrder = loadPreference(preferenceKeys.readingOrder);
+        if ([...readingOrder.options].some(option => option.value === savedReadingOrder)) {
+          readingOrder.value = savedReadingOrder;
+        }
+        skipBracketedText.checked = loadPreference(preferenceKeys.skipBracketedText) === 'true';
+        const savedPlaybackSpeed = Number(loadPreference(preferenceKeys.readerPlaybackSpeed));
+        if (Number.isFinite(savedPlaybackSpeed) && savedPlaybackSpeed >= 0.5 && savedPlaybackSpeed <= 2) {
+          readerPlaybackSpeed.value = String(savedPlaybackSpeed);
+          readerPlaybackValue.textContent = `${savedPlaybackSpeed.toFixed(1)}x`;
+          readerPlayer.playbackRate = savedPlaybackSpeed;
+        }
+      }
+
+      loadPreferences();
 
       choosePdf.addEventListener('click', () => pdf.click());
       pdf.addEventListener('change', () => {
@@ -215,6 +257,39 @@
           if (!depth) result += character;
         }
         return result.replace(/\s+([,.;:!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+      }
+
+      function capturePdfViewport(clientY) {
+        const pages = [...pdfViewer.querySelectorAll('.pdf-page')];
+        if (!pages.length) return null;
+        const viewerRect = pdfViewer.getBoundingClientRect();
+        const viewportOffset = Math.max(0, Math.min(
+          clientY === undefined ? pdfViewer.clientHeight / 2 : clientY - viewerRect.top,
+          pdfViewer.clientHeight,
+        ));
+        const documentY = pdfViewer.scrollTop + viewportOffset;
+        for (const page of pages) {
+          const pageRect = page.getBoundingClientRect();
+          const pageTop = pageRect.top - viewerRect.top + pdfViewer.scrollTop;
+          if (documentY >= pageTop && documentY <= pageTop + pageRect.height) {
+            return {
+              pageNumber: page.dataset.pageNumber,
+              pagePosition: (documentY - pageTop) / pageRect.height,
+              viewportOffset,
+            };
+          }
+        }
+        return null;
+      }
+
+      function restorePdfViewport(anchor) {
+        if (!anchor) return;
+        const page = pdfViewer.querySelector(`.pdf-page[data-page-number="${anchor.pageNumber}"]`);
+        if (!page) return;
+        const viewerRect = pdfViewer.getBoundingClientRect();
+        const pageRect = page.getBoundingClientRect();
+        const pageTop = pageRect.top - viewerRect.top + pdfViewer.scrollTop;
+        pdfViewer.scrollTop = Math.max(0, pageTop + (pageRect.height * anchor.pagePosition) - anchor.viewportOffset);
       }
 
       function splitForSpeech(value, limit = 440) {
@@ -265,13 +340,8 @@
         await renderPdfPages(paragraphs);
       }
 
-      async function renderPdfPages(paragraphs) {
-        const previousScroll = pdfViewer.scrollTop;
-        pdfViewer.replaceChildren();
-        const loading = document.createElement('p');
-        loading.className = 'pdf-loading';
-        loading.textContent = 'Rendering PDF pages...';
-        pdfViewer.append(loading);
+      async function renderPdfPages(paragraphs, viewportAnchor = capturePdfViewport(), scale = pdfScale) {
+        const renderVersion = ++pdfRenderVersion;
         const paragraphsByPage = new Map();
         paragraphs.forEach(paragraph => {
           const boxes = paragraph.boxes || [{
@@ -286,23 +356,27 @@
             paragraphsByPage.set(box.page, pageParagraphs);
           });
         });
-        pdfViewer.replaceChildren();
+        const renderedPages = document.createDocumentFragment();
         for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+          if (renderVersion !== pdfRenderVersion) return;
           const page = await pdfDocument.getPage(pageNumber);
-          const viewport = page.getViewport({scale: pdfScale});
+          const viewport = page.getViewport({scale});
+          const renderViewport = page.getViewport({scale: Math.max(scale, PDF_RENDER_SCALE)});
           const pixelRatio = window.devicePixelRatio || 1;
           const pageElement = document.createElement('div');
           pageElement.className = 'pdf-page';
+          pageElement.dataset.pageNumber = String(pageNumber);
           pageElement.style.width = `${viewport.width}px`;
           pageElement.style.height = `${viewport.height}px`;
           const canvas = document.createElement('canvas');
-          canvas.width = Math.floor(viewport.width * pixelRatio);
-          canvas.height = Math.floor(viewport.height * pixelRatio);
+          canvas.width = Math.floor(renderViewport.width * pixelRatio);
+          canvas.height = Math.floor(renderViewport.height * pixelRatio);
           canvas.style.width = `${viewport.width}px`;
           canvas.style.height = `${viewport.height}px`;
           pageElement.append(canvas);
           const context = canvas.getContext('2d');
-          await page.render({canvasContext: context, viewport, transform: [pixelRatio, 0, 0, pixelRatio, 0, 0]}).promise;
+          await page.render({canvasContext: context, viewport: renderViewport, transform: [pixelRatio, 0, 0, pixelRatio, 0, 0]}).promise;
+          if (renderVersion !== pdfRenderVersion) return;
           for (const paragraph of paragraphsByPage.get(pageNumber) || []) {
             const {box} = paragraph;
             const overlay = document.createElement('button');
@@ -317,21 +391,52 @@
             overlay.addEventListener('click', () => jumpToSource(paragraph.id));
             pageElement.append(overlay);
           }
-          pdfViewer.append(pageElement);
+          renderedPages.append(pageElement);
         }
-        pdfViewer.scrollTop = previousScroll;
-        pdfZoomValue.textContent = `${Math.round(pdfScale * 100)}%`;
+        if (renderVersion !== pdfRenderVersion) return;
+        pdfViewer.replaceChildren(renderedPages);
+        restorePdfViewport(viewportAnchor);
+        pdfZoomValue.textContent = `${Math.round(scale * 100)}%`;
         refreshPdfHighlights();
       }
 
-      async function changePdfZoom(change) {
+      function setPdfZoom(nextScale, viewportAnchor) {
         if (!pdfDocument) return;
-        pdfScale = Math.max(0.75, Math.min(2.5, Math.round((pdfScale + change) * 100) / 100));
-        try {
-          await renderPdfPages(preparedParagraphs);
-        } catch (error) {
-          readerStatus.textContent = `PDF zoom failed: ${error.message}`;
-        }
+        const scaleRatio = nextScale / pdfScale;
+        if (scaleRatio === 1) return;
+        pdfScale = nextScale;
+        const pageSizes = [...pdfViewer.querySelectorAll('.pdf-page')].map(page => ({
+          page,
+          canvas: page.querySelector('canvas'),
+          width: page.getBoundingClientRect().width,
+          height: page.getBoundingClientRect().height,
+        }));
+        pageSizes.forEach(({page, canvas, width, height}) => {
+          const scaledWidth = width * scaleRatio;
+          const scaledHeight = height * scaleRatio;
+          page.style.width = `${scaledWidth}px`;
+          page.style.height = `${scaledHeight}px`;
+          canvas.style.width = `${scaledWidth}px`;
+          canvas.style.height = `${scaledHeight}px`;
+        });
+        restorePdfViewport(viewportAnchor);
+        pdfZoomValue.textContent = `${Math.round(nextScale * 100)}%`;
+      }
+
+      function queuePdfZoom(change, clientY) {
+        if (!pdfDocument) return;
+        const baseScale = pendingPdfScale ?? pdfScale;
+        pendingPdfScale = Math.max(PDF_MIN_SCALE, Math.min(PDF_MAX_SCALE, Math.round((baseScale + change) * 100) / 100));
+        pendingPdfAnchor = capturePdfViewport(clientY);
+        if (pdfZoomFrame) return;
+        pdfZoomFrame = requestAnimationFrame(() => {
+          const targetScale = pendingPdfScale;
+          const targetAnchor = pendingPdfAnchor;
+          pendingPdfScale = undefined;
+          pendingPdfAnchor = undefined;
+          pdfZoomFrame = undefined;
+          setPdfZoom(targetScale, targetAnchor);
+        });
       }
 
       function refreshPdfHighlights() {
@@ -605,10 +710,19 @@
         const rate = Number(readerPlaybackSpeed.value);
         readerPlaybackValue.textContent = `${rate.toFixed(1)}x`;
         readerPlayer.playbackRate = rate;
+        savePreference(preferenceKeys.readerPlaybackSpeed, String(rate));
       });
 
-      pdfZoomOut.addEventListener('click', () => changePdfZoom(-0.15));
-      pdfZoomIn.addEventListener('click', () => changePdfZoom(0.15));
+      readingOrder.addEventListener('change', () => savePreference(preferenceKeys.readingOrder, readingOrder.value));
+      skipBracketedText.addEventListener('change', () => savePreference(preferenceKeys.skipBracketedText, String(skipBracketedText.checked)));
+
+      pdfZoomOut.addEventListener('click', () => queuePdfZoom(-0.15));
+      pdfZoomIn.addEventListener('click', () => queuePdfZoom(0.15));
+      pdfViewer.addEventListener('wheel', event => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        queuePdfZoom(event.deltaY < 0 ? 0.15 : -0.15, event.clientY);
+      }, {passive: false});
 
       readerToggle.addEventListener('click', () => {
         if (readerPlayer.paused) { readerPlayer.play(); readerToggle.textContent = 'Pause'; }
