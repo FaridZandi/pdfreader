@@ -259,11 +259,15 @@ test.describe('local reader', () => {
 
   test('moving the reading position scrolls the PDF to it', async ({ page }) => {
     await openReaderPage(page, port);
+    // The page has to be rendered before it can be scrolled anywhere.
+    await expect(page.locator('.pdf-paragraph[data-source-id="p2"]')).toBeVisible();
     // Park the view away from paragraph 2, then navigate to it by keyboard.
     await page.locator('#pdf-viewer').evaluate(viewer => { viewer.scrollTop = viewer.scrollHeight; });
+    await expect.poll(() => page.locator('#pdf-viewer').evaluate(viewer => viewer.scrollTop)).toBeGreaterThan(0);
     const parked = await page.locator('#pdf-viewer').evaluate(viewer => viewer.scrollTop);
-    expect(parked).toBeGreaterThan(0);
-    await page.locator('#pdf-viewer').click({position: {x: 5, y: 5}});
+    // Take focus off any control without clicking the page, which could land
+    // on a paragraph overlay and move the position by itself.
+    await page.evaluate(() => document.activeElement?.blur());
     await page.keyboard.press('j');
     await expect(page.locator('#reader-progress')).toContainText('Paragraph 2 of 2');
     await expect.poll(() => page.locator('#pdf-viewer').evaluate(viewer => viewer.scrollTop)).toBeLessThan(parked);
