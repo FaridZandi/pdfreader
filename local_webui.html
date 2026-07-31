@@ -1327,6 +1327,10 @@
         readerDrawer.hidden = false;
       }
 
+      function activateReaderView(button) {
+        [readerOutline, readerBookmarksButton, readerAnnotationsButton, readerReview].forEach(item => item.classList.toggle('active', item === button));
+      }
+
       function showOutline() {
         const items = readerOutlineItems.map(item => {
           const button = document.createElement('button');
@@ -1648,6 +1652,8 @@
             readerAnnotations = await listSourceLinkedRecords('annotations');
           } catch { readerBookmarks = []; readerAnnotations = []; }
         } else { readerBookmarks = []; readerAnnotations = []; }
+        activateReaderView(readerBookmarksButton);
+        showBookmarks();
         readerStatus.textContent = `Opening ${readerItems.length} paragraphs in the advanced reader...`;
         const resumeIndex = pendingResume?.sourceId === undefined || pendingResume?.sourceId === null
           ? -1
@@ -1713,10 +1719,10 @@
       readerOutline.addEventListener('click', showOutline);
       readerBookmark.addEventListener('click', createBookmark);
       readerBookmarksButton.addEventListener('click', async () => {
-        try { readerBookmarks = await listBookmarks(); showBookmarks(); }
+        try { readerBookmarks = await listBookmarks(); activateReaderView(readerBookmarksButton); showBookmarks(); }
         catch (error) { readerStatus.textContent = error.message; }
       });
-      readerAnnotationsButton.addEventListener('click', showAnnotations);
+      readerAnnotationsButton.addEventListener('click', () => { activateReaderView(readerAnnotationsButton); showAnnotations(); });
       readerSearch.addEventListener('input', updateSearchResults);
       readerSearchNext.addEventListener('click', () => moveSearchResult(1));
       readerSearchPrev.addEventListener('click', () => moveSearchResult(-1));
