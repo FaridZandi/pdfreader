@@ -50,6 +50,8 @@ The **Local library** keeps metadata such as a file name, page count, last-opene
 
 The reader can export the current paragraph, current section, or full reading queue as a WAV. Export runs only when requested, honors the current Kokoro voice speed and bracket-skipping option, and can be cancelled from the browser while generation is in progress. It is capped at 250,000 spoken characters per export and 4,000 characters per internal speech chunk.
 
+**Annotate** stores a source paragraph id, its current PDF boxes, color, note, excerpt, and timestamps in IndexedDB; annotations appear as a thin non-obscuring marker on the PDF. **Review** saves the current source paragraph to a local queue with manual **Reviewed** and **Review again** actions. The optional **Local assistance** field only records a local-model command preference; there is no remote-model fallback or implicit model execution. **Listen only** uses the same queue and resume position while hiding the PDF and transcript, and exposes play/pause and previous/next controls through the Media Session API when the browser supports it.
+
 ## Development workflow
 
 ```bash

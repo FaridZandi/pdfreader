@@ -68,7 +68,12 @@
       button.pdf-paragraph.status-playing { border-color: transparent; background: #0010ff14; }
       button.pdf-paragraph.status-playing::before { content: ''; position: absolute; top: -6px; bottom: -6px; left: -13px; width: 5px; border-radius: 999px; background: #6544b8; box-shadow: 0 1px 5px #6544b899; pointer-events: none; }
       button.pdf-paragraph.status-playing::after { content: ''; position: absolute; inset: -5px; border: 2px solid #6544b8; border-radius: 7px; box-shadow: 0 0 0 4px #6544b820; pointer-events: none; }
+      button.pdf-paragraph.annotated { box-shadow: inset 4px 0 0 #e3a400; }
       .reader-panel { min-height: 0; display: flex; flex-direction: column; border-left: 1px solid #4d405a; background: #201827; }
+      #reader.listen-only .reader-body { grid-template-columns: 1fr; }
+      #reader.listen-only #pdf-viewer, #reader.listen-only #transcript, #reader.listen-only .reader-search, #reader.listen-only #reader-drawer { display: none; }
+      #reader.listen-only .reader-panel { border-left: 0; align-items: center; justify-content: center; }
+      #reader.listen-only .reader-controls, #reader.listen-only .reader-actions { width: min(680px, 100%); box-sizing: border-box; }
       .reader-controls { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid #4d405a; }
       #reader-toggle { flex: 0 0 auto; min-width: 86px; }
       #reader-progress { color: #cfc2d8; font-size: .86rem; }
@@ -199,6 +204,10 @@
             <button id="reader-outline" type="button" disabled>Outline</button>
             <button id="reader-bookmark" type="button" disabled>Bookmark</button>
             <button id="reader-bookmarks" type="button" disabled>Bookmarks</button>
+            <button id="reader-annotate" type="button" disabled>Annotate</button>
+            <button id="reader-review" type="button" disabled>Review</button>
+            <button id="reader-listen-only" type="button" disabled>Listen only</button>
+            <button id="reader-local-assist" type="button">Local assistance</button>
             <button id="reader-export-paragraph" type="button" disabled>Export paragraph</button>
             <button id="reader-export-section" type="button" disabled>Export section</button>
             <button id="reader-export-document" type="button" disabled>Export document</button>
@@ -280,6 +289,10 @@
       const readerExportSection = document.querySelector('#reader-export-section');
       const readerExportDocument = document.querySelector('#reader-export-document');
       const readerExportCancel = document.querySelector('#reader-export-cancel');
+      const readerAnnotate = document.querySelector('#reader-annotate');
+      const readerReview = document.querySelector('#reader-review');
+      const readerListenOnly = document.querySelector('#reader-listen-only');
+      const readerLocalAssist = document.querySelector('#reader-local-assist');
       let audioUrl;
       let pdfUrl;
       let preparedParagraphs = [];
@@ -297,6 +310,7 @@
       let readerCompletedSeconds = 0;
       let currentDocumentFile;
       let exportAbortController;
+      let readerAnnotations = [];
       let pdfjsLib;
       let pdfDocument;
       let pdfSourceFile;
@@ -440,7 +454,7 @@
       function openReaderDatabase() {
         return new Promise((resolve, reject) => {
           if (!window.indexedDB) { reject(new Error('IndexedDB is unavailable in this browser.')); return; }
-          const request = indexedDB.open('pdfreader', 2);
+          const request = indexedDB.open('pdfreader', 3);
           request.onupgradeneeded = () => {
             const database = request.result;
             if (!database.objectStoreNames.contains('bookmarks')) {
@@ -460,6 +474,14 @@
               const store = database.createObjectStore('documentCollections', {keyPath: 'id'});
               store.createIndex('documentKey', 'documentKey', {unique: false});
               store.createIndex('collectionId', 'collectionId', {unique: false});
+            }
+            if (!database.objectStoreNames.contains('annotations')) {
+              const store = database.createObjectStore('annotations', {keyPath: 'id'});
+              store.createIndex('documentKey', 'documentKey', {unique: false});
+            }
+            if (!database.objectStoreNames.contains('reviews')) {
+              const store = database.createObjectStore('reviews', {keyPath: 'id'});
+              store.createIndex('documentKey', 'documentKey', {unique: false});
             }
           };
           request.onsuccess = () => resolve(request.result);
@@ -506,6 +528,82 @@
           readerBookmarks = await listBookmarks();
           readerStatus.textContent = 'Bookmark saved locally.';
         } catch (error) { readerStatus.textContent = error.message; }
+      }
+
+      async function listSourceLinkedRecords(storeName) {
+        if (!currentDocumentKey) return [];
+        const database = await openReaderDatabase();
+        try {
+          return await new Promise((resolve, reject) => {
+            const request = database.transaction(storeName, 'readonly').objectStore(storeName).index('documentKey').getAll(currentDocumentKey);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+        } finally { database.close(); }
+      }
+
+      async function createAnnotation() {
+        const item = readerItems[readerCurrentIndex];
+        if (!currentDocumentKey || !item?.sourceId) return;
+        const note = window.prompt('Annotation note:', '');
+        if (note === null) return;
+        const source = preparedParagraphs.find(paragraph => paragraph.id === item.sourceId);
+        await putLocalRecord('annotations', {
+          id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+          documentKey: currentDocumentKey,
+          sourceId: item.sourceId,
+          boxes: source?.boxes || [],
+          color: '#e3a400', note: note.trim(), excerpt: item.text.slice(0, 240),
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        });
+        readerAnnotations = await listSourceLinkedRecords('annotations');
+        refreshPdfHighlights();
+        readerStatus.textContent = 'Annotation saved locally.';
+      }
+
+      async function addToReview() {
+        const item = readerItems[readerCurrentIndex];
+        if (!currentDocumentKey || !item?.sourceId) return;
+        await putLocalRecord('reviews', {
+          id: `${currentDocumentKey}:${item.sourceId}`,
+          documentKey: currentDocumentKey, sourceId: item.sourceId,
+          excerpt: item.text.slice(0, 240), next_review_at: new Date().toISOString(), interval: 0, ease: 2.5,
+        });
+        readerStatus.textContent = 'Added to the local review queue.';
+      }
+
+      async function showReviewQueue() {
+        const reviews = await listSourceLinkedRecords('reviews');
+        const sourceIndices = new Map(readerItems.map((item, index) => [item.sourceId, index]));
+        const items = reviews.map(review => {
+          const wrap = document.createElement('div');
+          const button = document.createElement('button'); button.type = 'button'; button.className = 'drawer-item';
+          const index = sourceIndices.get(review.sourceId);
+          button.textContent = review.excerpt;
+          const meta = document.createElement('span'); meta.className = 'drawer-meta'; meta.textContent = 'Reviewed: mark after reading'; button.append(meta);
+          button.addEventListener('click', () => { if (index !== undefined) jumpToParagraph(index); });
+          const reviewed = document.createElement('button'); reviewed.type = 'button'; reviewed.className = 'drawer-item'; reviewed.textContent = 'Reviewed';
+          reviewed.addEventListener('click', async () => {
+            await putLocalRecord('reviews', {...review, next_review_at: new Date(Date.now() + 7 * 86400000).toISOString(), interval: 7, ease: review.ease + 0.1});
+            showReviewQueue();
+          });
+          const again = document.createElement('button'); again.type = 'button'; again.className = 'drawer-item'; again.textContent = 'Review again';
+          again.addEventListener('click', async () => {
+            await putLocalRecord('reviews', {...review, next_review_at: new Date().toISOString(), interval: 0, ease: Math.max(1.3, review.ease - 0.2)});
+            showReviewQueue();
+          });
+          wrap.append(button, reviewed, again); return wrap;
+        });
+        openDrawer('Review queue', items, 'No paragraphs are queued for review.');
+      }
+
+      function configureLocalAssistance() {
+        const command = window.prompt('Optional local-model command (leave blank to disable):', loadPreference('pdfreader.local-assistance-command') || '');
+        if (command === null) return;
+        savePreference('pdfreader.local-assistance-command', command.trim());
+        readerStatus.textContent = command.trim()
+          ? 'Local assistance is configured but intentionally has no remote fallback. Source-linked generation can be added for this local command.'
+          : 'Local assistance is disabled. No remote fallback is used.';
       }
 
       async function putLocalRecord(storeName, record) {
@@ -575,7 +673,7 @@
       async function removeDocument(key) {
         const database = await openReaderDatabase();
         try {
-          const transaction = database.transaction(['documents', 'offlineFiles', 'bookmarks', 'documentCollections'], 'readwrite');
+          const transaction = database.transaction(['documents', 'offlineFiles', 'bookmarks', 'annotations', 'reviews', 'documentCollections'], 'readwrite');
           transaction.objectStore('documents').delete(key);
           transaction.objectStore('offlineFiles').delete(key);
           const deleteMatching = storeName => {
@@ -587,6 +685,8 @@
             };
           };
           deleteMatching('bookmarks');
+          deleteMatching('annotations');
+          deleteMatching('reviews');
           deleteMatching('documentCollections');
           await new Promise((resolve, reject) => { transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); });
         } finally { database.close(); }
@@ -606,8 +706,8 @@
         if (!window.confirm('Remove all saved PDF metadata, offline copies, bookmarks, and collections from this browser?')) return;
         const database = await openReaderDatabase();
         try {
-          const transaction = database.transaction(['documents', 'offlineFiles', 'bookmarks', 'collections', 'documentCollections'], 'readwrite');
-          ['documents', 'offlineFiles', 'bookmarks', 'collections', 'documentCollections'].forEach(store => transaction.objectStore(store).clear());
+          const transaction = database.transaction(['documents', 'offlineFiles', 'bookmarks', 'annotations', 'reviews', 'collections', 'documentCollections'], 'readwrite');
+          ['documents', 'offlineFiles', 'bookmarks', 'annotations', 'reviews', 'collections', 'documentCollections'].forEach(store => transaction.objectStore(store).clear());
           await new Promise((resolve, reject) => { transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); });
         } finally { database.close(); }
         renderLibrary();
@@ -1032,7 +1132,8 @@
             : statuses.includes('converting') ? 'converting'
             : statuses.includes('ready') ? 'ready'
             : statuses.length && statuses.every(item => item === 'played') ? 'played' : 'queued';
-          overlay.className = `pdf-paragraph status-${status}`;
+          const annotated = readerAnnotations.some(annotation => annotation.sourceId === overlay.dataset.sourceId);
+          overlay.className = `pdf-paragraph status-${status}${annotated ? ' annotated' : ''}`;
         });
       }
 
@@ -1203,6 +1304,8 @@
         readerItems = [];
         readerCurrentIndex = -1;
         reader.hidden = true;
+        reader.classList.remove('listen-only');
+        readerListenOnly.textContent = 'Listen only';
         readerToggle.disabled = true;
         if (document.fullscreenElement === reader) document.exitFullscreen().catch(() => {});
       }
@@ -1275,6 +1378,13 @@
         readerAudioUrl = URL.createObjectURL(item.blobs[partIndex]);
         readerPlayer.src = readerAudioUrl;
         readerPlayer.playbackRate = Number(readerPlaybackSpeed.value);
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.metadata = new MediaMetadata({title: currentSection(), artist: readerTitle.textContent, album: 'PDF Reader'});
+          navigator.mediaSession.setActionHandler('play', () => readerPlayer.play());
+          navigator.mediaSession.setActionHandler('pause', () => readerPlayer.pause());
+          navigator.mediaSession.setActionHandler('nexttrack', () => jumpToParagraph(Math.min(readerItems.length - 1, readerCurrentIndex + 1)));
+          navigator.mediaSession.setActionHandler('previoustrack', () => jumpToParagraph(Math.max(0, readerCurrentIndex - 1)));
+        }
         readerPlayer.onended = () => {
           if (run !== readerRun) return;
           item.partStates[partIndex] = 'played';
@@ -1407,12 +1517,18 @@
         buildOutline();
         readerBookmark.disabled = !currentDocumentKey;
         readerBookmarksButton.disabled = !currentDocumentKey;
+        readerAnnotate.disabled = !currentDocumentKey;
+        readerReview.disabled = !currentDocumentKey;
+        readerListenOnly.disabled = false;
         readerExportParagraph.disabled = false;
         readerExportSection.disabled = false;
         readerExportDocument.disabled = false;
         if (currentDocumentKey) {
-          try { readerBookmarks = await listBookmarks(); } catch { readerBookmarks = []; }
-        } else readerBookmarks = [];
+          try {
+            readerBookmarks = await listBookmarks();
+            readerAnnotations = await listSourceLinkedRecords('annotations');
+          } catch { readerBookmarks = []; readerAnnotations = []; }
+        } else { readerBookmarks = []; readerAnnotations = []; }
         readerStatus.textContent = `Opening ${readerItems.length} paragraphs in the advanced reader...`;
         const resumeIndex = pendingResume?.sourceId === undefined || pendingResume?.sourceId === null
           ? -1
@@ -1484,6 +1600,13 @@
       readerSearch.addEventListener('input', updateSearchResults);
       readerSearchNext.addEventListener('click', () => moveSearchResult(1));
       readerSearchPrev.addEventListener('click', () => moveSearchResult(-1));
+      readerAnnotate.addEventListener('click', () => createAnnotation().catch(error => { readerStatus.textContent = error.message; }));
+      readerReview.addEventListener('click', () => addToReview().then(showReviewQueue).catch(error => { readerStatus.textContent = error.message; }));
+      readerListenOnly.addEventListener('click', () => {
+        reader.classList.toggle('listen-only');
+        readerListenOnly.textContent = reader.classList.contains('listen-only') ? 'Show reader' : 'Listen only';
+      });
+      readerLocalAssist.addEventListener('click', configureLocalAssistance);
       keepOffline.addEventListener('click', keepOfflineCopy);
       newCollection.addEventListener('click', createCollection);
       clearLibrary.addEventListener('click', clearAllLibraryData);
