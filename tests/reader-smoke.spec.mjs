@@ -73,6 +73,7 @@ test('extracts, starts the reader, jumps, persists resume, and preserves zoom co
     await expect(page.getByRole('button', {name: 'Open'})).toBeVisible();
     await page.getByRole('button', {name: 'Open'}).click();
     await expect(page.locator('#reader')).toBeVisible();
+    await expect(page.locator('#document-setup')).toBeHidden();
   } finally {
     await new Promise(resolve => server.close(resolve));
   }

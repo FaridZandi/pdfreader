@@ -187,14 +187,15 @@
           <div id="collection-list"></div>
         </section>
         <section class="setup-panel" id="document-setup" hidden role="dialog" aria-modal="true" aria-labelledby="setup-title">
-          <h2 id="setup-title">Add PDF to your library</h2>
-          <p id="file-name" class="panel-note">Choose extraction options. They will be saved with this imported document.</p>
+          <span class="import-kicker">Import PDF</span>
+          <h2 id="setup-title">Add to your library</h2>
+          <div class="import-file"><span class="import-file-icon">PDF</span><span id="file-name">Choose a PDF</span></div>
+          <p class="panel-note">This saves the PDF, creates its first-page preview, and extracts text once.</p>
           <div class="pdf-controls">
-            <div class="order-control"><label for="reading-order">Extraction engine</label><select id="reading-order"><option value="docling" selected>Docling text-only</option><option value="docling_no_ocr">Docling text-only (no OCR)</option><option value="source">Preserve source paragraphs</option><option value="columns">Column-aware layout</option></select></div>
-            <div class="preset-control"><label for="extraction-preset">Reading preset</label><select id="extraction-preset"><option value="prose" selected>Prose only</option><option value="prose_captions">Prose + captions</option><option value="full">Full document</option></select></div>
-            <button id="extract" type="button" disabled>Add and open</button>
+            <div class="preset-control"><label for="extraction-preset">What should be read aloud?</label><select id="extraction-preset"><option value="prose" selected>Prose only - recommended</option><option value="prose_captions">Prose and captions</option><option value="full">Everything Docling finds</option></select></div>
+            <details class="import-advanced"><summary>Advanced extraction</summary><div class="order-control"><label for="reading-order">Extraction engine</label><select id="reading-order"><option value="docling" selected>Docling text-only</option><option value="docling_no_ocr">Docling text-only (no OCR)</option><option value="source">Preserve source paragraphs</option><option value="columns">Column-aware layout</option></select></div></details>
           </div>
-          <div class="quick-tools"><button id="import-cancel" class="secondary" type="button">Cancel</button></div>
+          <div class="quick-tools"><button id="import-cancel" class="secondary" type="button">Cancel</button><button id="extract" type="button" disabled>Add and open</button></div>
           <p id="pdf-status">Choose a document to prepare it for reading.</p>
         </section>
       </div>
@@ -786,11 +787,7 @@
 
       async function openOfflineDocument(key) {
         const stored = await getLocalRecord('offlineFiles', key);
-        if (!stored?.file) return;
-        const transfer = new DataTransfer();
-        transfer.items.add(stored.file);
-        pdf.files = transfer.files;
-        pdf.dispatchEvent(new Event('change'));
+        return stored?.file;
       }
 
       async function clearAllLibraryData() {
@@ -903,23 +900,24 @@
       }
 
       async function openGalleryDocument(documentRecord) {
-        documentSetup.hidden = false;
+        documentSetup.hidden = true;
         fileName.textContent = documentRecord.fileName;
         currentDocumentKey = documentRecord.key;
+        currentDocumentFile = await openOfflineDocument(documentRecord.key);
+        if (!currentDocumentFile) return;
+        const transfer = new DataTransfer();
+        transfer.items.add(currentDocumentFile);
+        pdf.files = transfer.files;
         const stored = await getLocalRecord('extractions', documentRecord.key).catch(() => null);
         if (stored) {
           text.value = stored.text || '';
           preparedParagraphs = stored.paragraphs || [];
           allPreparedParagraphs = stored.allParagraphs || preparedParagraphs;
           lastFilterSummary = stored.filterSummary;
-          readDocument.disabled = !documentRecord.offline;
-          pdfStatus.textContent = documentRecord.offline
-            ? 'Saved extraction ready. Open this PDF in the reader.'
-            : 'Saved extraction, bookmarks, and highlights are ready. Select the original PDF to render it again.';
-        }
-        if (documentRecord.offline) {
-          openingGalleryKey = documentRecord.key;
-          await openOfflineDocument(documentRecord.key);
+          readDocument.disabled = !preparedParagraphs.length;
+          readerTitle.textContent = documentRecord.fileName;
+          pdfStatus.textContent = 'Opening saved document…';
+          readDocument.click();
         }
       }
 
