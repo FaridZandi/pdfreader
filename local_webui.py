@@ -7,6 +7,7 @@ import argparse
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -32,6 +33,130 @@ DOCLING = Path(sys.executable).with_name("docling")
 SAMPLE_RATE = 24_000
 MAX_TEXT_LENGTH = 4_000
 MAX_PDF_SIZE = 50 * 1024 * 1024
+READING_ORDERS = {"docling", "docling_no_ocr", "source", "columns"}
+EXTRACTION_PRESETS = {"prose", "prose_captions", "full"}
+PROSE_LABELS = {"text", "section_header", "title", "list_item"}
+
+
+def _normalise_block_text(value: str) -> str:
+    """Normalise repeated running text while ignoring changing page numbers."""
+    value = re.sub(r"\b\d+\b", "#", value.casefold())
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _primary_page(paragraph: dict[str, object]) -> int | None:
+    boxes = paragraph.get("boxes", [])
+    if not isinstance(boxes, list) or not boxes:
+        return None
+    page = boxes[0].get("page")
+    return int(page) if isinstance(page, (int, float)) else None
+
+
+def _is_page_edge(paragraph: dict[str, object]) -> bool:
+    """Whether every provenance box sits in the top or bottom 10% of a page."""
+    boxes = paragraph.get("boxes", [])
+    if not isinstance(boxes, list) or not boxes:
+        return False
+    for box in boxes:
+        bbox = box.get("bbox", {})
+        page_size = box.get("page_size", {})
+        height = float(page_size.get("height", 0))
+        if not height:
+            return False
+        top = float(bbox.get("t", 0)) / height
+        bottom = float(bbox.get("b", 0)) / height
+        if not (top >= 0.9 or bottom <= 0.1):
+            return False
+    return True
+
+
+def _looks_like_figure_label(paragraph: dict[str, object], caption_pages: set[int]) -> bool:
+    value = str(paragraph.get("text", "")).strip()
+    if re.fullmatch(r"(?:fig(?:ure)?|table)\.?\s*\d+[a-z]?", value, flags=re.IGNORECASE):
+        return True
+    page = _primary_page(paragraph)
+    return bool(
+        page in caption_pages
+        and paragraph.get("label") in {"text", "list_item"}
+        and re.fullmatch(r"(?:\d+|[a-z])", value, flags=re.IGNORECASE)
+    )
+
+
+def _looks_like_reference_entry(paragraph: dict[str, object]) -> bool:
+    if paragraph.get("label") == "list_item":
+        return True
+    value = str(paragraph.get("text", "")).strip()
+    return bool(re.match(r"^(?:\[?\d+\]?|[A-Z][\w'’-]+,\s*[A-Z])", value))
+
+
+def annotate_filter_reasons(paragraphs: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Attach transparent, deterministic prose-filter reasons to source blocks."""
+    repeated_edge_text: set[str] = set()
+    occurrences: dict[str, set[int]] = {}
+    for paragraph in paragraphs:
+        page = _primary_page(paragraph)
+        normalized = _normalise_block_text(str(paragraph["text"]))
+        if page is not None and normalized and _is_page_edge(paragraph):
+            occurrences.setdefault(normalized, set()).add(page)
+    repeated_edge_text = {value for value, pages in occurrences.items() if len(pages) >= 2}
+
+    caption_pages = {page for paragraph in paragraphs if paragraph.get("label") == "caption" if (page := _primary_page(paragraph)) is not None}
+    annotated: list[dict[str, object]] = []
+    reference_section = False
+    for paragraph in paragraphs:
+        value = str(paragraph["text"])
+        label = str(paragraph.get("label", ""))
+        normalized = _normalise_block_text(value)
+        reasons: list[str] = []
+        if normalized in repeated_edge_text:
+            reasons.append("header_footer")
+        if label == "caption":
+            reasons.append("caption")
+        if normalized in {"references", "bibliography"} and label in {"title", "section_header", "text"}:
+            reasons.append("reference_heading")
+            reference_section = True
+        elif reference_section and _looks_like_reference_entry(paragraph):
+            reasons.append("reference_entry")
+        if _looks_like_figure_label(paragraph, caption_pages):
+            reasons.append("figure_label")
+        if label in {"text", "list_item"} and len(value.split()) == 1:
+            reasons.append("isolated_token")
+        annotated.append({**paragraph, "filter_reasons": reasons})
+    return annotated
+
+
+def content_for_preset(all_paragraphs: list[dict[str, object]], preset: str) -> dict[str, object]:
+    """Create a reading queue without changing stable source paragraph ids."""
+    if preset not in EXTRACTION_PRESETS:
+        raise ValueError("Unknown extraction preset.")
+    selected: list[dict[str, object]] = []
+    hidden_reasons: dict[str, int] = {}
+    for paragraph in all_paragraphs:
+        label = str(paragraph.get("label", ""))
+        reasons = list(paragraph.get("filter_reasons", []))
+        suppressed_reason: str | None = None
+        if preset != "full":
+            if label not in PROSE_LABELS and not (preset == "prose_captions" and label == "caption"):
+                suppressed_reason = "caption" if label == "caption" else "non_prose"
+            else:
+                non_caption_reasons = [reason for reason in reasons if reason != "caption"]
+                if non_caption_reasons:
+                    suppressed_reason = non_caption_reasons[0]
+        if suppressed_reason:
+            hidden_reasons[suppressed_reason] = hidden_reasons.get(suppressed_reason, 0) + 1
+            continue
+        selected.append(paragraph)
+    return {
+        "text": "\n\n".join(str(item["text"]) for item in selected),
+        "paragraphs": selected,
+        "all_paragraphs": all_paragraphs,
+        "filter_summary": {
+            "preset": preset,
+            "visible": len(selected),
+            "hidden": len(all_paragraphs) - len(selected),
+            "reasons": hidden_reasons,
+        },
+    }
 
 
 def to_wav(audio: np.ndarray) -> bytes:
@@ -157,7 +282,13 @@ def _page_reading_order(page: dict[str, object]) -> str:
     return _join_lines(ordered)
 
 
-def extract_with_docling(input_file: Path, output_directory: Path, *, no_ocr: bool = False) -> dict[str, object]:
+def extract_with_docling(
+    input_file: Path,
+    output_directory: Path,
+    *,
+    no_ocr: bool = False,
+    preset: str = "prose",
+) -> dict[str, object]:
     """Return Docling text blocks and geometry without exporting image payloads."""
     output_directory.mkdir(parents=True, exist_ok=True)
     command = [
@@ -182,15 +313,9 @@ def extract_with_docling(input_file: Path, output_directory: Path, *, no_ocr: bo
     document = json.loads(json_files[0].read_text(encoding="utf-8"))
     pages = document.get("pages", {})
     paragraphs: list[dict[str, object]] = []
-    included_labels = {"text", "section_header", "title", "list_item", "caption"}
     for text_index, item in enumerate(document.get("texts", [])):
         value = str(item.get("text", "")).strip()
-        if not value or item.get("label") not in included_labels:
-            continue
-        # Standalone labels and numbers around figures are commonly exposed as
-        # text blocks.  They are not useful in the read-aloud stream; keep all
-        # multi-word prose, captions, and list entries unchanged.
-        if len(value.split()) == 1:
+        if not value:
             continue
         boxes: list[dict[str, object]] = []
         for provenance in item.get("prov", []):
@@ -207,19 +332,36 @@ def extract_with_docling(input_file: Path, output_directory: Path, *, no_ocr: bo
                     "page_size": {key: float(size[key]) for key in ("width", "height")},
                 }
             )
-        if boxes:
-            # A Docling text item can span multiple regions or pages.  It is one
-            # logical piece of prose, so keep it as one reading-queue item and
-            # retain all of its boxes solely for PDF highlighting.
-            paragraphs.append({"id": str(text_index), "text": value, "boxes": boxes})
-    text = "\n\n".join(str(item["text"]) for item in paragraphs)
-    return {"text": text, "paragraphs": paragraphs}
+        # A Docling text item can span multiple regions or pages.  It is one
+        # logical piece of prose, so keep it as one reading-queue item and
+        # retain all of its boxes solely for PDF highlighting.  A rare text
+        # item without geometry remains readable in the Full document preset.
+        paragraphs.append(
+            {
+                "id": str(text_index),
+                "text": value,
+                "label": str(item.get("label", "")),
+                "page": int(boxes[0]["page"]) if boxes else None,
+                "boxes": boxes,
+            }
+        )
+    return content_for_preset(annotate_filter_reasons(paragraphs), preset)
 
 
-def extract_pdf_text(input_file: Path, reading_order: str, output_directory: Path) -> dict[str, object]:
+def extract_pdf_text(
+    input_file: Path,
+    reading_order: str,
+    output_directory: Path,
+    preset: str,
+) -> dict[str, object]:
     """Extract text with Docling or an explicitly selected Poppler fallback."""
     if reading_order in {"docling", "docling_no_ocr"}:
-        return extract_with_docling(input_file, output_directory, no_ocr=reading_order == "docling_no_ocr")
+        return extract_with_docling(
+            input_file,
+            output_directory,
+            no_ocr=reading_order == "docling_no_ocr",
+            preset=preset,
+        )
     if reading_order == "source":
         result = subprocess.run(
             ["pdftotext", "-raw", "-enc", "UTF-8", str(input_file), "-"],
@@ -230,7 +372,13 @@ def extract_pdf_text(input_file: Path, reading_order: str, output_directory: Pat
         if result.returncode:
             message = result.stderr.decode("utf-8", errors="replace").strip()
             raise ValueError(message or "This PDF could not be read.")
-        return {"text": result.stdout.decode("utf-8", errors="replace").replace("\f", "\n\n").strip(), "paragraphs": []}
+        text = result.stdout.decode("utf-8", errors="replace").replace("\f", "\n\n").strip()
+        return {
+            "text": text,
+            "paragraphs": [],
+            "all_paragraphs": [],
+            "filter_summary": {"preset": preset, "visible": 0, "hidden": 0, "reasons": {}},
+        }
 
     result = subprocess.run(
         ["pdftotext", "-bbox", "-enc", "UTF-8", str(input_file), "-"],
@@ -243,7 +391,12 @@ def extract_pdf_text(input_file: Path, reading_order: str, output_directory: Pat
         raise ValueError(message or "This PDF could not be read.")
     parser = BBoxParser()
     parser.feed(result.stdout.decode("utf-8", errors="replace"))
-    return {"text": "\n\n".join(filter(None, (_page_reading_order(page) for page in parser.pages))).strip(), "paragraphs": []}
+    return {
+        "text": "\n\n".join(filter(None, (_page_reading_order(page) for page in parser.pages))).strip(),
+        "paragraphs": [],
+        "all_paragraphs": [],
+        "filter_summary": {"preset": preset, "visible": 0, "hidden": 0, "reasons": {}},
+    }
 
 
 class KokoroApp:
@@ -267,7 +420,7 @@ class KokoroApp:
             raise ValueError("Kokoro did not produce audio for that text.")
         return to_wav(np.concatenate(chunks))
 
-    def extract_pdf(self, pdf: bytes, reading_order: str) -> dict[str, object]:
+    def extract_pdf(self, pdf: bytes, reading_order: str, preset: str) -> dict[str, object]:
         """Extract text from a user PDF without retaining the uploaded file."""
         if b"%PDF-" not in pdf[:1024]:
             raise ValueError("That file does not look like a PDF.")
@@ -276,7 +429,7 @@ class KokoroApp:
         with tempfile.TemporaryDirectory(dir=temporary_root) as directory:
             input_file = Path(directory) / "document.pdf"
             input_file.write_bytes(pdf)
-            content = extract_pdf_text(input_file, reading_order, Path(directory) / "output")
+            content = extract_pdf_text(input_file, reading_order, Path(directory) / "output", preset)
         if not content["text"]:
             raise ValueError(
                 "No selectable text was found. This may be a scanned PDF; run OCR on it first."
@@ -359,9 +512,12 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
                 if not 0 < length <= MAX_PDF_SIZE:
                     raise ValueError("Choose a PDF smaller than 50 MB.")
                 reading_order = self.headers.get("X-Reading-Order", "source")
-                if reading_order not in {"docling", "docling_no_ocr", "source", "columns"}:
+                if reading_order not in READING_ORDERS:
                     raise ValueError("Unknown PDF reading-order option.")
-                content = app.extract_pdf(self.rfile.read(length), reading_order)
+                preset = self.headers.get("X-Extraction-Preset", "prose")
+                if preset not in EXTRACTION_PRESETS:
+                    raise ValueError("Unknown PDF reading preset.")
+                content = app.extract_pdf(self.rfile.read(length), reading_order, preset)
             except (ValueError, subprocess.TimeoutExpired) as error:
                 self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
                 return

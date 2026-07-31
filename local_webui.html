@@ -19,7 +19,7 @@
       .pdf-controls { margin: 0 0 20px; }
       .pdf-controls > div { min-width: 0; }
       .pdf-controls > div:first-child { flex: 1 1 260px; }
-      .order-control { flex: 0 1 195px; min-width: 155px; }
+      .order-control, .preset-control { flex: 0 1 195px; min-width: 155px; }
       .pdf-controls > #extract { flex: 0 0 auto; padding: 0 16px; }
       .file-picker { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 43px; }
       #choose-pdf { flex: 0 0 auto; }
@@ -45,6 +45,7 @@
       .reader-header { display: flex; align-items: center; gap: 16px; min-height: 64px; padding: 0 20px; background: #251d30; }
       .reader-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
       #reader-close { flex: 0 0 auto; min-height: 38px; padding: 0 14px; background: #47365b; }
+      #reader-help { flex: 0 0 auto; min-height: 38px; padding: 0 14px; background: #47365b; }
       .reader-body { min-height: 0; display: grid; grid-template-columns: minmax(0, 2fr) minmax(310px, 1fr); }
       #pdf-viewer { overflow: auto; padding: 24px; background: #3b3343; }
       .pdf-loading { margin: 0; color: #ddd3e4; text-align: center; }
@@ -77,6 +78,13 @@
       .status-converting .chunk-meta { color: #f5c776; }
       .status-ready .chunk-meta, .status-played .chunk-meta { color: #8fdbb0; }
       .status-error .chunk-meta { color: #ffaaa4; }
+      #reader-help-dialog { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 24px; background: #0009; }
+      #reader-help-dialog[hidden] { display: none; }
+      .shortcut-card { width: min(430px, 100%); padding: 24px; border-radius: 14px; background: #2b2136; box-shadow: 0 18px 44px #0008; }
+      .shortcut-card h2 { margin: 0 0 12px; font-size: 1.15rem; }
+      .shortcut-card dl { display: grid; grid-template-columns: auto 1fr; gap: 9px 15px; margin: 0 0 20px; color: #e1d7e8; }
+      .shortcut-card dt { color: #bfa6e5; font-weight: 700; }
+      .shortcut-card dd { margin: 0; }
       @media (max-width: 760px) { .pdf-controls { flex-wrap: wrap; } .pdf-controls > div:first-child { flex-basis: 100%; } .reader-body { grid-template-columns: 1fr; grid-template-rows: minmax(45vh, 1fr) minmax(35vh, 1fr); } .reader-panel { border-left: 0; border-top: 1px solid #4d405a; } }
       @media (prefers-color-scheme: dark) { body { background: #16131b; color: #eae4ee; } main { background: #24202a; box-shadow: none; } .subtitle, #status { color: #cfc5d2; } textarea, input { border-color: #625b67; } button.secondary { background: #453561; color: #eee6fb; } }
     </style>
@@ -95,12 +103,20 @@
           </div>
         </div>
         <div class="order-control">
-          <label for="reading-order">Reading order</label>
+          <label for="reading-order">Extraction engine</label>
           <select id="reading-order">
             <option value="docling" selected>Docling text-only</option>
             <option value="docling_no_ocr">Docling text-only (no OCR)</option>
             <option value="source">Preserve source paragraphs</option>
             <option value="columns">Column-aware layout</option>
+          </select>
+        </div>
+        <div class="preset-control">
+          <label for="extraction-preset">Reading preset</label>
+          <select id="extraction-preset">
+            <option value="prose" selected>Prose only</option>
+            <option value="prose_captions">Prose + captions</option>
+            <option value="full">Full document</option>
           </select>
         </div>
         <button id="extract" type="button" disabled>Extract text</button>
@@ -128,13 +144,14 @@
     <section id="reader" hidden aria-label="PDF reader">
       <header class="reader-header">
         <span id="reader-title" class="reader-title">PDF reader</span>
+        <button id="reader-help" type="button" aria-keyshortcuts="?">Shortcuts</button>
         <button id="reader-close" type="button">Exit reader</button>
       </header>
       <div class="reader-body">
         <div id="pdf-viewer" aria-label="Selected PDF"><p class="pdf-loading">The PDF will render here when reading begins.</p></div>
         <aside class="reader-panel">
           <div class="reader-controls">
-            <button id="reader-toggle" type="button" disabled>Pause</button>
+            <button id="reader-toggle" type="button" aria-keyshortcuts="Space" disabled>Pause</button>
             <span id="reader-progress">Preparing reader...</span>
             <div class="pdf-zoom" aria-label="PDF zoom controls" title="Use Command/Ctrl + scroll to zoom around the pointer">
               <button id="pdf-zoom-out" type="button" title="Zoom out">-</button>
@@ -152,6 +169,19 @@
         </aside>
       </div>
     </section>
+    <section id="reader-help-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="reader-help-title">
+      <div class="shortcut-card">
+        <h2 id="reader-help-title">Reader shortcuts</h2>
+        <dl>
+          <dt>Space</dt><dd>Play or pause</dd>
+          <dt>J / K</dt><dd>Next / previous paragraph</dd>
+          <dt>[ / ]</dt><dd>Slower / faster playback</dd>
+          <dt>- / =</dt><dd>Zoom out / in</dd>
+          <dt>Esc</dt><dd>Close this help, or exit reader</dd>
+        </dl>
+        <button id="reader-help-close" type="button">Close</button>
+      </div>
+    </section>
 
     <script>
       const text = document.querySelector('#text');
@@ -163,6 +193,7 @@
       const fileName = document.querySelector('#file-name');
       const extract = document.querySelector('#extract');
       const readingOrder = document.querySelector('#reading-order');
+      const extractionPreset = document.querySelector('#extraction-preset');
       const readDocument = document.querySelector('#read-document');
       const player = document.querySelector('#player');
       const status = document.querySelector('#status');
@@ -181,9 +212,17 @@
       const readerStatus = document.querySelector('#reader-status');
       const transcript = document.querySelector('#transcript');
       const readerClose = document.querySelector('#reader-close');
+      const readerHelp = document.querySelector('#reader-help');
+      const readerHelpDialog = document.querySelector('#reader-help-dialog');
+      const readerHelpClose = document.querySelector('#reader-help-close');
       let audioUrl;
       let pdfUrl;
       let preparedParagraphs = [];
+      let allPreparedParagraphs = [];
+      let lastFilterSummary;
+      let currentDocumentKey;
+      let pendingResume;
+      let documentSelectionVersion = 0;
       let pdfjsLib;
       let pdfDocument;
       let pdfSourceFile;
@@ -207,6 +246,7 @@
         readerPlaybackSpeed: 'pdfreader.reader-playback-speed',
         skipBracketedText: 'pdfreader.skip-bracketed-text',
         readingOrder: 'pdfreader.reading-order',
+        extractionPreset: 'pdfreader.extraction-preset',
       };
 
       function loadPreference(key) {
@@ -217,10 +257,111 @@
         try { localStorage.setItem(key, value); } catch { /* Storage is optional. */ }
       }
 
+      function resumeStorageKey() {
+        return currentDocumentKey ? `pdfreader.resume.${currentDocumentKey}` : null;
+      }
+
+      function loadDocumentResume() {
+        const key = resumeStorageKey();
+        if (!key) return null;
+        try {
+          const value = JSON.parse(localStorage.getItem(key) || 'null');
+          return value?.version === 1 ? value : null;
+        } catch { return null; }
+      }
+
+      function saveDocumentResume() {
+        const key = resumeStorageKey();
+        const item = readerItems[readerCurrentIndex];
+        if (!key || !item) return;
+        try {
+          localStorage.setItem(key, JSON.stringify({
+            version: 1,
+            sourceId: item.sourceId,
+            speechChunk: item.partIndex,
+            readingOrder: readingOrder.value,
+            preset: extractionPreset.value,
+            playbackSpeed: Number(readerPlaybackSpeed.value),
+            skipBracketedText: skipBracketedText.checked,
+            zoom: pdfScale,
+            updatedAt: new Date().toISOString(),
+          }));
+        } catch { /* Storage is optional. */ }
+      }
+
+      async function identifyDocument(file) {
+        if (!window.crypto?.subtle) return null;
+        const bytes = await file.arrayBuffer();
+        const digest = await crypto.subtle.digest('SHA-256', bytes);
+        return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+      }
+
+      function applyResumePreferences(resume) {
+        if (!resume) return;
+        if ([...readingOrder.options].some(option => option.value === resume.readingOrder)) {
+          readingOrder.value = resume.readingOrder;
+        }
+        if ([...extractionPreset.options].some(option => option.value === resume.preset)) {
+          extractionPreset.value = resume.preset;
+        }
+        if (Number.isFinite(resume.playbackSpeed) && resume.playbackSpeed >= 0.5 && resume.playbackSpeed <= 2) {
+          readerPlaybackSpeed.value = String(resume.playbackSpeed);
+          readerPlaybackValue.textContent = `${resume.playbackSpeed.toFixed(1)}x`;
+        }
+        if (typeof resume.skipBracketedText === 'boolean') skipBracketedText.checked = resume.skipBracketedText;
+        if (Number.isFinite(resume.zoom) && resume.zoom >= PDF_MIN_SCALE && resume.zoom <= PDF_MAX_SCALE) {
+          pdfScale = resume.zoom;
+        }
+      }
+
+      const proseLabels = new Set(['text', 'section_header', 'title', 'list_item']);
+
+      function selectParagraphsForPreset(allParagraphs, preset) {
+        const reasons = {};
+        const paragraphs = allParagraphs.filter(paragraph => {
+          const label = paragraph.label || '';
+          const filterReasons = paragraph.filter_reasons || [];
+          let hiddenReason;
+          if (preset !== 'full') {
+            if (!proseLabels.has(label) && !(preset === 'prose_captions' && label === 'caption')) {
+              hiddenReason = label === 'caption' ? 'caption' : 'non_prose';
+            } else {
+              hiddenReason = filterReasons.find(reason => reason !== 'caption');
+            }
+          }
+          if (!hiddenReason) return true;
+          reasons[hiddenReason] = (reasons[hiddenReason] || 0) + 1;
+          return false;
+        });
+        return {paragraphs, filter_summary: {preset, visible: paragraphs.length, hidden: allParagraphs.length - paragraphs.length, reasons}};
+      }
+
+      function filterSummaryMessage(summary) {
+        if (!summary || !summary.hidden) return `${summary?.visible || 0} reading paragraphs ready.`;
+        const labels = {header_footer: 'headers/footers', caption: 'captions', reference_heading: 'reference headings', reference_entry: 'reference entries', figure_label: 'figure labels', isolated_token: 'isolated tokens', non_prose: 'non-prose blocks'};
+        const detail = Object.entries(summary.reasons || {}).map(([reason, count]) => `${count} ${labels[reason] || reason}`).join(', ');
+        return `${summary.visible} reading paragraphs ready; ${summary.hidden} hidden (${detail}).`;
+      }
+
+      function applyPreparedPreset() {
+        if (!allPreparedParagraphs.length) return false;
+        const selected = selectParagraphsForPreset(allPreparedParagraphs, extractionPreset.value);
+        preparedParagraphs = selected.paragraphs;
+        lastFilterSummary = selected.filter_summary;
+        text.value = preparedParagraphs.map(paragraph => paragraph.text).join('\n\n');
+        readDocument.disabled = !preparedParagraphs.length;
+        pdfStatus.textContent = `${filterSummaryMessage(lastFilterSummary)} This preset was applied locally without re-extracting.`;
+        return true;
+      }
+
       function loadPreferences() {
         const savedReadingOrder = loadPreference(preferenceKeys.readingOrder);
         if ([...readingOrder.options].some(option => option.value === savedReadingOrder)) {
           readingOrder.value = savedReadingOrder;
+        }
+        const savedPreset = loadPreference(preferenceKeys.extractionPreset);
+        if ([...extractionPreset.options].some(option => option.value === savedPreset)) {
+          extractionPreset.value = savedPreset;
         }
         skipBracketedText.checked = loadPreference(preferenceKeys.skipBracketedText) === 'true';
         const savedPlaybackSpeed = Number(loadPreference(preferenceKeys.readerPlaybackSpeed));
@@ -234,13 +375,29 @@
       loadPreferences();
 
       choosePdf.addEventListener('click', () => pdf.click());
-      pdf.addEventListener('change', () => {
+      pdf.addEventListener('change', async () => {
         const file = pdf.files[0];
         if (!file) return;
+        const selectionVersion = ++documentSelectionVersion;
+        currentDocumentKey = undefined;
+        pendingResume = undefined;
         fileName.textContent = file.name;
         extract.disabled = false;
         readDocument.disabled = true;
-        pdfStatus.textContent = 'PDF selected. Click Extract text to prepare it for reading.';
+        preparedParagraphs = [];
+        allPreparedParagraphs = [];
+        pdfStatus.textContent = 'Identifying PDF locally to restore its reader settings...';
+        try {
+          currentDocumentKey = await identifyDocument(file);
+          if (selectionVersion !== documentSelectionVersion) return;
+          pendingResume = loadDocumentResume();
+          applyResumePreferences(pendingResume);
+          pdfStatus.textContent = pendingResume
+            ? 'Previous reading position and settings restored. Click Extract text to prepare this PDF.'
+            : 'PDF selected. Click Extract text to prepare it for reading.';
+        } catch {
+          if (selectionVersion === documentSelectionVersion) pdfStatus.textContent = 'PDF selected. Click Extract text to prepare it for reading.';
+        }
       });
 
       function splitDocumentParagraphs(value) {
@@ -421,6 +578,7 @@
         });
         restorePdfViewport(viewportAnchor);
         pdfZoomValue.textContent = `${Math.round(nextScale * 100)}%`;
+        saveDocumentResume();
       }
 
       function queuePdfZoom(change, clientY) {
@@ -502,6 +660,7 @@
         refreshTranscript();
         if (reveal) transcript.querySelector('.chunk.active')?.scrollIntoView({block: 'nearest', behavior: 'auto'});
         if (reveal) pdfViewer.querySelector(`.pdf-paragraph[data-source-id="${readerItems[index]?.sourceId}"]`)?.scrollIntoView({block: 'center', behavior: 'auto'});
+        saveDocumentResume();
       }
 
       function unloadReaderAudio() {
@@ -513,6 +672,7 @@
       }
 
       function stopReader() {
+        saveDocumentResume();
         readerRun += 1;
         unloadReaderAudio();
         readerItems = [];
@@ -533,6 +693,7 @@
         readerToggle.disabled = true;
         focusParagraph(index);
         readerStatus.textContent = `Preparing paragraph ${index + 1}...`;
+        saveDocumentResume();
         startCurrentParagraph(readerRun);
       }
 
@@ -555,6 +716,7 @@
             item.blobs[partIndex] = blob;
             item.partStates[partIndex] = 'ready';
             refreshTranscript();
+            saveDocumentResume();
             if (itemIndex === readerCurrentIndex && item.partIndex === partIndex) startCurrentParagraph(run);
             pumpConversionQueue(run);
           })
@@ -594,6 +756,7 @@
           if (partIndex + 1 < item.parts.length) {
             item.partIndex += 1;
             refreshTranscript();
+            saveDocumentResume();
             startCurrentParagraph(run);
             return;
           }
@@ -602,6 +765,7 @@
             refreshTranscript();
             readerStatus.textContent = 'Finished reading.';
             readerToggle.disabled = true;
+            saveDocumentResume();
             return;
           }
           focusParagraph(nextIndex, true);
@@ -610,6 +774,7 @@
         readerToggle.disabled = false;
         readerToggle.textContent = 'Pause';
         refreshTranscript();
+        saveDocumentResume();
         readerStatus.textContent = 'Playing. The conversion queue is preparing upcoming paragraphs.';
         pumpConversionQueue(run);
         readerPlayer.play().catch(() => {
@@ -627,18 +792,27 @@
         try {
           const response = await fetch('/api/extract-pdf', {
             method: 'POST',
-            headers: {'Content-Type': 'application/pdf', 'X-Reading-Order': readingOrder.value},
+            headers: {
+              'Content-Type': 'application/pdf',
+              'X-Reading-Order': readingOrder.value,
+              'X-Extraction-Preset': extractionPreset.value,
+            },
             body: file
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || 'Could not extract the PDF.');
           text.value = result.text;
           preparedParagraphs = result.paragraphs || [];
+          allPreparedParagraphs = result.all_paragraphs || preparedParagraphs;
+          lastFilterSummary = result.filter_summary;
           if (pdfUrl) URL.revokeObjectURL(pdfUrl);
           readerTitle.textContent = file.name;
-          readDocument.disabled = false;
+          readDocument.disabled = !text.value.trim();
           text.focus();
-          pdfStatus.textContent = `Loaded ${file.name}. If the text order is wrong, choose a fallback and extract again.`;
+          const summary = preparedParagraphs.length
+            ? filterSummaryMessage(lastFilterSummary)
+            : 'Text is ready (this fallback does not expose PDF paragraph geometry).';
+          pdfStatus.textContent = `Loaded ${file.name}. ${summary} If the text order is wrong, choose a different engine and extract again.`;
         } catch (error) {
           pdfStatus.textContent = error.message;
         } finally {
@@ -694,12 +868,21 @@
         }).filter(item => item.parts.length);
         if (!readerItems.length) return;
         readerStatus.textContent = `Opening ${readerItems.length} paragraphs in the advanced reader...`;
-        readerCurrentIndex = 0;
+        const resumeIndex = pendingResume?.sourceId === undefined || pendingResume?.sourceId === null
+          ? -1
+          : readerItems.findIndex(item => item.sourceId === pendingResume.sourceId);
+        readerCurrentIndex = resumeIndex >= 0 ? resumeIndex : 0;
+        if (resumeIndex >= 0) {
+          const item = readerItems[readerCurrentIndex];
+          item.partIndex = Math.max(0, Math.min(item.parts.length - 1, Number(pendingResume.speechChunk) || 0));
+          readerStatus.textContent = `Resuming paragraph ${readerCurrentIndex + 1}...`;
+        }
         renderTranscript();
-        focusParagraph(0);
+        focusParagraph(readerCurrentIndex);
         try {
           await renderPdf(pdf.files[0], preparedParagraphs);
           startCurrentParagraph(run);
+          pendingResume = undefined;
         } catch (error) {
           readerStatus.textContent = `PDF rendering failed: ${error.message}`;
           readerToggle.disabled = true;
@@ -711,10 +894,24 @@
         readerPlaybackValue.textContent = `${rate.toFixed(1)}x`;
         readerPlayer.playbackRate = rate;
         savePreference(preferenceKeys.readerPlaybackSpeed, String(rate));
+        saveDocumentResume();
       });
 
-      readingOrder.addEventListener('change', () => savePreference(preferenceKeys.readingOrder, readingOrder.value));
-      skipBracketedText.addEventListener('change', () => savePreference(preferenceKeys.skipBracketedText, String(skipBracketedText.checked)));
+      readingOrder.addEventListener('change', () => {
+        savePreference(preferenceKeys.readingOrder, readingOrder.value);
+        saveDocumentResume();
+      });
+      extractionPreset.addEventListener('change', () => {
+        savePreference(preferenceKeys.extractionPreset, extractionPreset.value);
+        if (!applyPreparedPreset() && pdf.files[0]) {
+          pdfStatus.textContent = 'This extraction engine needs to run again before its reading preset can be applied.';
+        }
+        saveDocumentResume();
+      });
+      skipBracketedText.addEventListener('change', () => {
+        savePreference(preferenceKeys.skipBracketedText, String(skipBracketedText.checked));
+        saveDocumentResume();
+      });
 
       pdfZoomOut.addEventListener('click', () => queuePdfZoom(-0.15));
       pdfZoomIn.addEventListener('click', () => queuePdfZoom(0.15));
@@ -724,11 +921,35 @@
         queuePdfZoom(event.deltaY < 0 ? 0.15 : -0.15, event.clientY);
       }, {passive: false});
 
-      readerToggle.addEventListener('click', () => {
+      function toggleReaderPlayback() {
+        if (readerToggle.disabled) return;
         if (readerPlayer.paused) { readerPlayer.play(); readerToggle.textContent = 'Pause'; }
         else { readerPlayer.pause(); readerToggle.textContent = 'Play'; readerStatus.textContent = 'Paused.'; }
-      });
+      }
+
+      readerToggle.addEventListener('click', toggleReaderPlayback);
       readerClose.addEventListener('click', stopReader);
+      readerHelp.addEventListener('click', () => { readerHelpDialog.hidden = false; readerHelpClose.focus(); });
+      readerHelpClose.addEventListener('click', () => { readerHelpDialog.hidden = true; readerHelp.focus(); });
+      document.addEventListener('keydown', event => {
+        if (reader.hidden || event.metaKey || event.ctrlKey || event.altKey) return;
+        const tagName = document.activeElement?.tagName;
+        if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          if (!readerHelpDialog.hidden) { readerHelpDialog.hidden = true; readerHelp.focus(); }
+          else stopReader();
+          return;
+        }
+        if (!readerHelpDialog.hidden) return;
+        if (event.key === ' ') { event.preventDefault(); toggleReaderPlayback(); return; }
+        if (event.key === 'j' || event.key === 'J') { event.preventDefault(); jumpToParagraph(Math.min(readerItems.length - 1, readerCurrentIndex + 1)); return; }
+        if (event.key === 'k' || event.key === 'K') { event.preventDefault(); jumpToParagraph(Math.max(0, readerCurrentIndex - 1)); return; }
+        if (event.key === '[') { event.preventDefault(); readerPlaybackSpeed.value = String(Math.max(0.5, Number(readerPlaybackSpeed.value) - 0.1)); readerPlaybackSpeed.dispatchEvent(new Event('input')); return; }
+        if (event.key === ']') { event.preventDefault(); readerPlaybackSpeed.value = String(Math.min(2, Number(readerPlaybackSpeed.value) + 0.1)); readerPlaybackSpeed.dispatchEvent(new Event('input')); return; }
+        if (event.key === '-') { event.preventDefault(); queuePdfZoom(-0.15); return; }
+        if (event.key === '=') { event.preventDefault(); queuePdfZoom(0.15); }
+      });
       document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && !reader.hidden) reader.focus?.(); });
     </script>
   </body>
