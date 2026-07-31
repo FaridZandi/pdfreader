@@ -257,6 +257,30 @@ test.describe('local reader', () => {
     expect(await page.locator('#reader-player').evaluate(player => player.paused)).toBe(true);
   });
 
+  test('moving the reading position scrolls the PDF to it', async ({ page }) => {
+    await openReaderPage(page, port);
+    // Park the view away from paragraph 2, then navigate to it by keyboard.
+    await page.locator('#pdf-viewer').evaluate(viewer => { viewer.scrollTop = viewer.scrollHeight; });
+    const parked = await page.locator('#pdf-viewer').evaluate(viewer => viewer.scrollTop);
+    expect(parked).toBeGreaterThan(0);
+    await page.locator('#pdf-viewer').click({position: {x: 5, y: 5}});
+    await page.keyboard.press('j');
+    await expect(page.locator('#reader-progress')).toContainText('Paragraph 2 of 2');
+    await expect.poll(() => page.locator('#pdf-viewer').evaluate(viewer => viewer.scrollTop)).toBeLessThan(parked);
+  });
+
+  test('a dialog owns the keyboard while it is open', async ({ page }) => {
+    await openReaderPage(page, port);
+    const paragraph = page.locator('.pdf-paragraph[data-source-id="p1"]');
+    await paragraph.hover();
+    await paragraph.locator('[data-tool="note"]').click();
+    await expect(page.locator('#entry-dialog')).toBeVisible();
+    // Escape closes the note, not the reader.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#entry-dialog')).toBeHidden();
+    await expect(page.locator('#reader')).toBeVisible();
+  });
+
   test('searching marks matches without hiding any PDF paragraph', async ({ page }) => {
     await openReaderPage(page, port);
     await page.getByRole('button', {name: 'Text'}).click();
