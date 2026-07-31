@@ -61,14 +61,15 @@
       .pdf-loading { margin: 0; color: #ddd3e4; text-align: center; }
       .pdf-page { position: relative; width: max-content; margin: 0 auto 24px; box-shadow: 0 4px 22px #0007; }
       .pdf-page canvas { display: block; }
-      button.pdf-paragraph { position: absolute; min-height: 0; border: 1px solid transparent; border-radius: 3px; background: #0000; cursor: pointer; }
-      button.pdf-paragraph:hover { border-color: #a78bf0; background: #a78bf014; }
-      button.pdf-paragraph.status-converting { border-color: #d6a833; border-style: dashed; background: #ffba871f; }
-      button.pdf-paragraph.status-ready, button.pdf-paragraph.status-played { border-color: #6caa8588; background: #00ff3814; }
-      button.pdf-paragraph.status-playing { border-color: transparent; background: #0010ff14; }
-      button.pdf-paragraph.status-playing::before { content: ''; position: absolute; top: -6px; bottom: -6px; left: -13px; width: 5px; border-radius: 999px; background: #6544b8; box-shadow: 0 1px 5px #6544b899; pointer-events: none; }
-      button.pdf-paragraph.status-playing::after { content: ''; position: absolute; inset: -5px; border: 2px solid #6544b8; border-radius: 7px; box-shadow: 0 0 0 4px #6544b820; pointer-events: none; }
-      button.pdf-paragraph.annotated { box-shadow: inset 4px 0 0 #e3a400; }
+      .pdf-paragraph { position: absolute; min-height: 0; border: 1px solid transparent; border-radius: 3px; background: #0000; cursor: pointer; }
+      .pdf-paragraph:hover { border-color: #a78bf0; background: #a78bf014; }
+      .pdf-paragraph.status-converting { border-color: #d6a833; border-style: dashed; background: #ffba871f; }
+      .pdf-paragraph.status-ready, .pdf-paragraph.status-played { border-color: #6caa8588; background: #00ff3814; }
+      .pdf-paragraph.status-playing { border-color: transparent; background: #0010ff14; }
+      .pdf-paragraph.status-playing::before { content: ''; position: absolute; top: -6px; bottom: -6px; left: -13px; width: 5px; border-radius: 999px; background: #6544b8; box-shadow: 0 1px 5px #6544b899; pointer-events: none; }
+      .pdf-paragraph.status-playing::after { content: ''; position: absolute; inset: -5px; border: 2px solid #6544b8; border-radius: 7px; box-shadow: 0 0 0 4px #6544b820; pointer-events: none; }
+      .pdf-paragraph.annotated { box-shadow: inset 4px 0 0 #e3a400; }
+      .pdf-paragraph.search-filtered { opacity: .14; pointer-events: none; }
       .reader-panel { min-height: 0; display: flex; flex-direction: column; border-left: 1px solid #4d405a; background: #201827; }
       #reader.listen-only .reader-body { grid-template-columns: 1fr; }
       #reader.listen-only #pdf-viewer, #reader.listen-only #transcript, #reader.listen-only .reader-search, #reader.listen-only #reader-drawer { display: none; }
@@ -112,70 +113,91 @@
       .shortcut-card dl { display: grid; grid-template-columns: auto 1fr; gap: 9px 15px; margin: 0 0 20px; color: #e1d7e8; }
       .shortcut-card dt { color: #bfa6e5; font-weight: 700; }
       .shortcut-card dd { margin: 0; }
+      /* Gallery-first application shell. */
+      body { display: block; background: #f2f4f8; }
+      main { width: min(1240px, calc(100% - 40px)); min-height: 100vh; margin: 0 auto; padding: 32px 0 52px; border-radius: 0; background: transparent; box-shadow: none; }
+      .home-header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
+      .home-header h1 { font-size: 2rem; }
+      .home-header .subtitle { flex: 1; margin: 4px 0 0; }
+      .home-header button { flex: 0 0 auto; padding: 0 18px; }
+      .gallery-layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 24px; align-items: start; }
+      .gallery-panel, .setup-panel { padding: 22px; border: 1px solid #e1e4eb; border-radius: 16px; background: #fff; box-shadow: 0 8px 24px #19233b0a; }
+      .gallery-panel h2, .setup-panel h2 { margin: 0 0 4px; font-size: 1.1rem; }
+      .panel-note { margin: 0 0 18px; color: #6b7280; font-size: .86rem; }
+      #library-list { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin: 0; }
+      .library-item { position: relative; display: block; min-height: 148px; padding: 16px; border-color: #e3e6ee; border-radius: 13px; background: linear-gradient(145deg,#fff,#f7f8fb); }
+      .library-item::before { content: 'PDF'; display: grid; place-items: center; width: 38px; height: 48px; margin-bottom: 13px; border-radius: 5px; background: #e8edff; color: #3954a5; font-size: .65rem; font-weight: 800; letter-spacing: .08em; }
+      .library-item-name { font-size: .92rem; }
+      .library-item-meta { margin-top: 5px; line-height: 1.45; }
+      .library-item-actions { display: flex; gap: 6px; margin-top: 14px; }
+      .library-item-actions button { min-height: 30px; padding: 0 9px; border-radius: 7px; }
+      .setup-panel { position: sticky; top: 24px; }
+      .setup-panel[hidden] { display: none; }
+      .setup-panel .pdf-controls { display: grid; grid-template-columns: 1fr; gap: 13px; margin: 18px 0 0; }
+      .setup-panel .pdf-controls > div, .setup-panel .order-control, .setup-panel .preset-control { min-width: 0; }
+      .setup-panel #extract { width: 100%; }
+      .quick-tools { display: flex; gap: 8px; margin-top: 14px; }
+      .quick-tools button { min-height: 36px; font-size: .8rem; }
+      .legacy-tts { display: none; }
+      .library { margin: 22px 0 0; padding: 0; border: 0; }
+      .library-header, #collection-list, .footnote { display: none; }
+      .reader-body { grid-template-columns: minmax(0, 1fr) 350px; }
+      .reader-panel { background: #201827; }
+      .reader-controls { flex-wrap: wrap; gap: 9px; padding: 12px 14px; }
+      #reader-progress { order: 5; flex: 1 0 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .reader-actions { padding: 0 14px; gap: 0; }
+      .reader-actions button { flex: 1; min-height: 42px; border-radius: 0; background: transparent; color: #bdb0c7; font-size: .74rem; }
+      .reader-actions button.active { color: #fff; box-shadow: inset 0 -2px #a88cf0; }
+      .reader-actions button[data-secondary] { display: none; }
+      .reader-search { padding: 12px 14px; }
+      #reader-drawer { display: block; flex: 1; max-height: none; padding: 12px 14px 24px; border: 0; background: transparent; }
+      #reader-drawer[hidden] { display: block; }
+      #reader-status { padding: 0 14px 10px; }
+      #transcript { display: none; }
+      .pdf-paragraph { overflow: visible; }
+      .paragraph-tools { position: absolute; z-index: 3; top: -34px; right: 0; display: flex; gap: 3px; padding: 3px; border-radius: 8px; background: #251d30; box-shadow: 0 4px 15px #0006; opacity: 0; transform: translateY(4px); transition: opacity .15s, transform .15s; pointer-events: none; }
+      .pdf-paragraph:hover .paragraph-tools, .pdf-paragraph:focus-within .paragraph-tools { opacity: 1; transform: none; pointer-events: auto; }
+      .paragraph-tools button { min-height: 25px; min-width: 25px; padding: 0 6px; border-radius: 5px; background: #47365b; color: #fff; font-size: .74rem; }
+      #entry-dialog { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 24px; background: #0008; }
+      #entry-dialog[hidden] { display: none; }
+      .entry-card { width: min(410px, 100%); padding: 22px; border-radius: 14px; background: #fff; color: #1d1b20; box-shadow: 0 18px 44px #0008; }
+      .entry-card h2 { margin: 0 0 8px; font-size: 1.1rem; }
+      .entry-card p { margin: 0 0 16px; color: #635e68; font-size: .88rem; }
+      .entry-card textarea, .entry-card input { margin-bottom: 12px; min-height: 0; }
+      .entry-card .dialog-actions { display: flex; justify-content: end; gap: 8px; }
+      .entry-card .dialog-actions button { flex: 0 0 auto; min-height: 36px; padding: 0 13px; }
+      @media (max-width: 820px) { main { width: min(100% - 24px, 1240px); } .gallery-layout { grid-template-columns: 1fr; } .setup-panel { position: static; } .reader-body { grid-template-columns: 1fr; } }
       @media (max-width: 760px) { .pdf-controls { flex-wrap: wrap; } .pdf-controls > div:first-child { flex-basis: 100%; } .reader-body { grid-template-columns: 1fr; grid-template-rows: minmax(45vh, 1fr) minmax(35vh, 1fr); } .reader-panel { border-left: 0; border-top: 1px solid #4d405a; } }
       @media (prefers-color-scheme: dark) { body { background: #16131b; color: #eae4ee; } main { background: #24202a; box-shadow: none; } .subtitle, #status { color: #cfc5d2; } textarea, input { border-color: #625b67; } button.secondary { background: #453561; color: #eee6fb; } }
     </style>
   </head>
   <body>
     <main>
-      <h1>Kokoro</h1>
-      <p class="subtitle">Local text-to-speech - American English - af_heart voice</p>
-      <div class="pdf-controls">
-        <div>
-          <label for="pdf">Open a PDF</label>
-          <div class="file-picker">
-            <button id="choose-pdf" class="secondary" type="button">Choose PDF...</button>
-            <span id="file-name">No file selected</span>
-            <input id="pdf" type="file" accept="application/pdf,.pdf" hidden>
+      <header class="home-header">
+        <div><h1>PDF Reader</h1><p class="subtitle">Your local reading desk</p></div>
+        <button id="choose-pdf" type="button">Add PDF</button>
+        <input id="pdf" type="file" accept="application/pdf,.pdf" hidden>
+      </header>
+      <div class="gallery-layout">
+        <section class="gallery-panel" aria-labelledby="library-title">
+          <h2 id="library-title">Your PDFs</h2>
+          <p class="panel-note">Extracted text, reading position, bookmarks, highlights, and notes stay with each document on this Mac.</p>
+          <div id="library-list"><p class="library-empty">Add a PDF to start your local library.</p></div>
+          <div id="collection-list"></div>
+        </section>
+        <section class="setup-panel" id="document-setup" hidden aria-labelledby="setup-title">
+          <h2 id="setup-title">Prepare document</h2>
+          <p id="file-name" class="panel-note">Choose a PDF from your library or add a new one.</p>
+          <div class="pdf-controls">
+            <div class="order-control"><label for="reading-order">Extraction engine</label><select id="reading-order"><option value="docling" selected>Docling text-only</option><option value="docling_no_ocr">Docling text-only (no OCR)</option><option value="source">Preserve source paragraphs</option><option value="columns">Column-aware layout</option></select></div>
+            <div class="preset-control"><label for="extraction-preset">Reading preset</label><select id="extraction-preset"><option value="prose" selected>Prose only</option><option value="prose_captions">Prose + captions</option><option value="full">Full document</option></select></div>
+            <button id="extract" type="button" disabled>Extract and read</button>
           </div>
-        </div>
-        <div class="order-control">
-          <label for="reading-order">Extraction engine</label>
-          <select id="reading-order">
-            <option value="docling" selected>Docling text-only</option>
-            <option value="docling_no_ocr">Docling text-only (no OCR)</option>
-            <option value="source">Preserve source paragraphs</option>
-            <option value="columns">Column-aware layout</option>
-          </select>
-        </div>
-        <div class="preset-control">
-          <label for="extraction-preset">Reading preset</label>
-          <select id="extraction-preset">
-            <option value="prose" selected>Prose only</option>
-            <option value="prose_captions">Prose + captions</option>
-            <option value="full">Full document</option>
-          </select>
-        </div>
-        <button id="extract" type="button" disabled>Extract text</button>
+          <div class="quick-tools"><button id="keep-offline" class="secondary" type="button" disabled>Keep offline</button><button id="clear-library" class="secondary" type="button">Clear library</button></div>
+          <p id="pdf-status">Choose a document to prepare it for reading.</p>
+        </section>
       </div>
-      <p id="pdf-status">Docling text-only is recommended for papers. It keeps image data out of the text sent to Kokoro.</p>
-      <label for="text">Text to convert</label>
-      <textarea id="text" autofocus>Local/self-hosted: Kokoro-82M. Surprisingly natural for an 82M-parameter model, fast enough to run on CPU, Apache-licensed, and effectively free after compute. Best value for English narration.</textarea>
-      <div class="controls">
-        <div class="speed">
-          <label for="speed">Voice speed</label>
-          <input id="speed" type="number" min="0.5" max="2" step="0.1" value="1">
-        </div>
-        <label class="skip-brackets" for="skip-bracketed-text" title="Skip square-bracketed citations and references during speech">
-          <input id="skip-bracketed-text" type="checkbox">
-          Skip [bracketed text]
-        </label>
-        <button id="convert" type="button">Convert to speech</button>
-        <button id="read-document" class="secondary" type="button" disabled>Read full screen</button>
-      </div>
-      <p id="status" role="status"></p>
-      <audio id="player" controls></audio>
-      <section class="library" aria-labelledby="library-title">
-        <div class="library-header">
-          <h2 id="library-title">Local library</h2>
-          <button id="keep-offline" type="button" disabled>Keep offline copy</button>
-          <button id="new-collection" type="button">New collection</button>
-          <button id="clear-library" type="button">Clear library</button>
-        </div>
-        <div id="library-list"><p class="library-empty">Recent PDFs will appear here. Files are not kept unless you explicitly save an offline copy.</p></div>
-        <div id="collection-list"></div>
-      </section>
-      <p class="footnote">PDF text and audio are processed on this Mac and are not sent to a remote service.</p>
+      <div class="legacy-tts"><textarea id="text"></textarea><input id="speed" value="1"><input id="skip-bracketed-text" type="checkbox"><button id="convert"></button><button id="read-document"></button><audio id="player"></audio><p id="status"></p><button id="new-collection"></button></div>
     </main>
 
     <section id="reader" hidden aria-label="PDF reader">
@@ -202,15 +224,16 @@
           </div>
           <div class="reader-actions">
             <button id="reader-outline" type="button" disabled>Outline</button>
-            <button id="reader-bookmark" type="button" disabled>Bookmark</button>
             <button id="reader-bookmarks" type="button" disabled>Bookmarks</button>
-            <button id="reader-annotate" type="button" disabled>Annotate</button>
+            <button id="reader-annotations" type="button" disabled>Highlights</button>
             <button id="reader-review" type="button" disabled>Review</button>
-            <button id="reader-listen-only" type="button" disabled>Listen only</button>
-            <button id="reader-local-assist" type="button">Local assistance</button>
-            <button id="reader-export-paragraph" type="button" disabled>Export paragraph</button>
-            <button id="reader-export-section" type="button" disabled>Export section</button>
-            <button id="reader-export-document" type="button" disabled>Export document</button>
+            <button id="reader-bookmark" data-secondary type="button" disabled>Bookmark</button>
+            <button id="reader-annotate" data-secondary type="button" disabled>Annotate</button>
+            <button id="reader-listen-only" data-secondary type="button" disabled>Listen only</button>
+            <button id="reader-local-assist" data-secondary type="button">Local assistance</button>
+            <button id="reader-export-paragraph" data-secondary type="button" disabled>Export paragraph</button>
+            <button id="reader-export-section" data-secondary type="button" disabled>Export section</button>
+            <button id="reader-export-document" data-secondary type="button" disabled>Export document</button>
             <button id="reader-export-cancel" type="button" hidden>Cancel export</button>
           </div>
           <div class="reader-search">
@@ -225,6 +248,14 @@
           <audio id="reader-player"></audio>
         </aside>
       </div>
+    </section>
+    <section id="entry-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="entry-title">
+      <form class="entry-card" id="entry-form">
+        <h2 id="entry-title">Add note</h2><p id="entry-description"></p>
+        <input id="entry-name" hidden>
+        <textarea id="entry-note" rows="4" placeholder="Optional note"></textarea>
+        <div class="dialog-actions"><button id="entry-cancel" class="secondary" type="button">Cancel</button><button type="submit">Save</button></div>
+      </form>
     </section>
     <section id="reader-help-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="reader-help-title">
       <div class="shortcut-card">
@@ -248,6 +279,7 @@
       const pdf = document.querySelector('#pdf');
       const choosePdf = document.querySelector('#choose-pdf');
       const fileName = document.querySelector('#file-name');
+      const documentSetup = document.querySelector('#document-setup');
       const extract = document.querySelector('#extract');
       const readingOrder = document.querySelector('#reading-order');
       const extractionPreset = document.querySelector('#extraction-preset');
@@ -275,6 +307,7 @@
       const readerOutline = document.querySelector('#reader-outline');
       const readerBookmark = document.querySelector('#reader-bookmark');
       const readerBookmarksButton = document.querySelector('#reader-bookmarks');
+      const readerAnnotationsButton = document.querySelector('#reader-annotations');
       const readerSearch = document.querySelector('#reader-search');
       const readerSearchPrev = document.querySelector('#reader-search-prev');
       const readerSearchNext = document.querySelector('#reader-search-next');
@@ -293,6 +326,13 @@
       const readerReview = document.querySelector('#reader-review');
       const readerListenOnly = document.querySelector('#reader-listen-only');
       const readerLocalAssist = document.querySelector('#reader-local-assist');
+      const entryDialog = document.querySelector('#entry-dialog');
+      const entryForm = document.querySelector('#entry-form');
+      const entryTitle = document.querySelector('#entry-title');
+      const entryDescription = document.querySelector('#entry-description');
+      const entryName = document.querySelector('#entry-name');
+      const entryNote = document.querySelector('#entry-note');
+      const entryCancel = document.querySelector('#entry-cancel');
       let audioUrl;
       let pdfUrl;
       let preparedParagraphs = [];
@@ -311,6 +351,7 @@
       let currentDocumentFile;
       let exportAbortController;
       let readerAnnotations = [];
+      let entrySubmit;
       let pdfjsLib;
       let pdfDocument;
       let pdfSourceFile;
@@ -455,7 +496,7 @@
       function openReaderDatabase() {
         return new Promise((resolve, reject) => {
           if (!window.indexedDB) { reject(new Error('IndexedDB is unavailable in this browser.')); return; }
-          const request = indexedDB.open('pdfreader', 3);
+          const request = indexedDB.open('pdfreader', 4);
           request.onupgradeneeded = () => {
             const database = request.result;
             if (!database.objectStoreNames.contains('bookmarks')) {
@@ -484,6 +525,9 @@
               const store = database.createObjectStore('reviews', {keyPath: 'id'});
               store.createIndex('documentKey', 'documentKey', {unique: false});
             }
+            if (!database.objectStoreNames.contains('extractions')) {
+              database.createObjectStore('extractions', {keyPath: 'key'});
+            }
           };
           request.onsuccess = () => resolve(request.result);
           request.onerror = () => reject(request.error || new Error('Could not open local bookmark storage.'));
@@ -502,23 +546,35 @@
         } finally { database.close(); }
       }
 
+      function openEntryDialog({title, description, name = '', note = '', onSave}) {
+        entryTitle.textContent = title;
+        entryDescription.textContent = description;
+        entryName.value = name;
+        entryName.hidden = !name;
+        entryNote.value = note;
+        entryDialog.hidden = false;
+        entrySubmit = onSave;
+        entryNote.focus();
+      }
+
+      entryCancel.addEventListener('click', () => { entryDialog.hidden = true; entrySubmit = undefined; });
+      entryForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const submit = entrySubmit;
+        entryDialog.hidden = true;
+        entrySubmit = undefined;
+        if (submit) await submit({name: entryName.value.trim(), note: entryNote.value.trim()});
+      });
+
       async function createBookmark() {
         const item = readerItems[readerCurrentIndex];
         if (!currentDocumentKey || !item?.sourceId) {
           readerStatus.textContent = 'Select this PDF again before saving a source-linked bookmark.';
           return;
         }
-        const note = window.prompt('Optional bookmark note:', '');
-        if (note === null) return;
-        const bookmark = {
-          id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
-          documentKey: currentDocumentKey,
-          sourceId: item.sourceId,
-          note: note.trim(),
-          excerpt: item.text.slice(0, 240),
-          createdAt: new Date().toISOString(),
-        };
-        try {
+        openEntryDialog({title: 'Bookmark paragraph', description: item.text.slice(0, 160), onSave: async ({note}) => {
+          const bookmark = {id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, documentKey: currentDocumentKey, sourceId: item.sourceId, note, excerpt: item.text.slice(0, 240), createdAt: new Date().toISOString()};
+          try {
           const database = await openReaderDatabase();
           await new Promise((resolve, reject) => {
             const request = database.transaction('bookmarks', 'readwrite').objectStore('bookmarks').put(bookmark);
@@ -528,7 +584,8 @@
           database.close();
           readerBookmarks = await listBookmarks();
           readerStatus.textContent = 'Bookmark saved locally.';
-        } catch (error) { readerStatus.textContent = error.message; }
+          } catch (error) { readerStatus.textContent = error.message; }
+        }});
       }
 
       async function listSourceLinkedRecords(storeName) {
@@ -546,20 +603,20 @@
       async function createAnnotation() {
         const item = readerItems[readerCurrentIndex];
         if (!currentDocumentKey || !item?.sourceId) return;
-        const note = window.prompt('Annotation note:', '');
-        if (note === null) return;
+        openEntryDialog({title: 'Highlight paragraph', description: item.text.slice(0, 160), onSave: async ({note}) => {
         const source = preparedParagraphs.find(paragraph => paragraph.id === item.sourceId);
         await putLocalRecord('annotations', {
           id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
           documentKey: currentDocumentKey,
           sourceId: item.sourceId,
           boxes: source?.boxes || [],
-          color: '#e3a400', note: note.trim(), excerpt: item.text.slice(0, 240),
+          color: '#e3a400', note, excerpt: item.text.slice(0, 240),
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
         });
         readerAnnotations = await listSourceLinkedRecords('annotations');
         refreshPdfHighlights();
         readerStatus.textContent = 'Annotation saved locally.';
+        }});
       }
 
       async function addToReview() {
@@ -599,12 +656,7 @@
       }
 
       function configureLocalAssistance() {
-        const command = window.prompt('Optional local-model command (leave blank to disable):', loadPreference('pdfreader.local-assistance-command') || '');
-        if (command === null) return;
-        savePreference('pdfreader.local-assistance-command', command.trim());
-        readerStatus.textContent = command.trim()
-          ? 'Local assistance is configured but intentionally has no remote fallback. Source-linked generation can be added for this local command.'
-          : 'Local assistance is disabled. No remote fallback is used.';
+        readerStatus.textContent = 'Local assistance is not configured. This reader never sends document text to a remote model.';
       }
 
       async function putLocalRecord(storeName, record) {
@@ -677,9 +729,10 @@
       async function removeDocument(key) {
         const database = await openReaderDatabase();
         try {
-          const transaction = database.transaction(['documents', 'offlineFiles', 'bookmarks', 'annotations', 'reviews', 'documentCollections'], 'readwrite');
+          const transaction = database.transaction(['documents', 'offlineFiles', 'extractions', 'bookmarks', 'annotations', 'reviews', 'documentCollections'], 'readwrite');
           transaction.objectStore('documents').delete(key);
           transaction.objectStore('offlineFiles').delete(key);
+          transaction.objectStore('extractions').delete(key);
           const deleteMatching = storeName => {
             const index = transaction.objectStore(storeName).index('documentKey');
             index.openCursor(IDBKeyRange.only(key)).onsuccess = event => {
@@ -708,47 +761,43 @@
       }
 
       async function clearAllLibraryData() {
-        if (!window.confirm('Remove all saved PDF metadata, offline copies, bookmarks, and collections from this browser?')) return;
+        openEntryDialog({title: 'Clear local library', description: 'This removes gallery records, saved extraction text, offline files, highlights, notes, and bookmarks from this browser. Click Save to continue.', onSave: async () => {
         const database = await openReaderDatabase();
         try {
-          const transaction = database.transaction(['documents', 'offlineFiles', 'bookmarks', 'annotations', 'reviews', 'collections', 'documentCollections'], 'readwrite');
-          ['documents', 'offlineFiles', 'bookmarks', 'annotations', 'reviews', 'collections', 'documentCollections'].forEach(store => transaction.objectStore(store).clear());
+          const transaction = database.transaction(['documents', 'offlineFiles', 'extractions', 'bookmarks', 'annotations', 'reviews', 'collections', 'documentCollections'], 'readwrite');
+          ['documents', 'offlineFiles', 'extractions', 'bookmarks', 'annotations', 'reviews', 'collections', 'documentCollections'].forEach(store => transaction.objectStore(store).clear());
           await new Promise((resolve, reject) => { transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); });
         } finally { database.close(); }
         try {
           Object.keys(localStorage).filter(key => key.startsWith('pdfreader.resume.')).forEach(key => localStorage.removeItem(key));
         } catch { /* Storage is optional. */ }
         renderLibrary();
+        }});
       }
 
       async function createCollection() {
-        const name = window.prompt('Collection name:');
-        if (!name?.trim()) return;
-        const color = window.prompt('Collection color (hex):', '#7052c9') || '#7052c9';
-        await putLocalRecord('collections', {id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, name: name.trim(), color, order: Date.now(), createdAt: new Date().toISOString()});
-        renderLibrary();
+        openEntryDialog({title: 'New collection', description: 'Give this local collection a name.', name: 'Collection', onSave: async ({name}) => {
+          if (!name) return;
+          await putLocalRecord('collections', {id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, name, color: '#7052c9', order: Date.now(), createdAt: new Date().toISOString()});
+          renderLibrary();
+        }});
       }
 
       async function addCurrentDocumentToCollection() {
         if (!currentDocumentKey) return;
         const collections = await allLocalRecords('collections');
         if (!collections.length) { await createCollection(); return addCurrentDocumentToCollection(); }
-        const name = window.prompt(`Add to collection:\n${collections.map(item => item.name).join('\n')}`);
-        const collection = collections.find(item => item.name === name?.trim());
-        if (!collection) return;
-        await putLocalRecord('documentCollections', {id: `${currentDocumentKey}:${collection.id}`, documentKey: currentDocumentKey, collectionId: collection.id, order: Date.now()});
-        renderLibrary();
+        const collection = collections[0];
+        await putLocalRecord('documentCollections', {id: `${currentDocumentKey}:${collection.id}`, documentKey: currentDocumentKey, collectionId: collection.id, order: Date.now()}); renderLibrary();
       }
 
       async function renameCollection(collection) {
-        const name = window.prompt('Collection name:', collection.name);
-        if (!name?.trim()) return;
-        await putLocalRecord('collections', {...collection, name: name.trim()});
-        renderLibrary();
+        openEntryDialog({title: 'Rename collection', description: 'Update this collection name.', name: collection.name, onSave: async ({name}) => {
+          if (!name) return; await putLocalRecord('collections', {...collection, name}); renderLibrary();
+        }});
       }
 
       async function deleteCollection(collection) {
-        if (!window.confirm(`Delete the “${collection.name}” collection? Documents and notes will remain.`)) return;
         const database = await openReaderDatabase();
         try {
           const transaction = database.transaction(['collections', 'documentCollections'], 'readwrite');
@@ -804,13 +853,31 @@
             collect.disabled = documentRecord.key !== currentDocumentKey;
             collect.addEventListener('click', addCurrentDocumentToCollection);
             const open = document.createElement('button'); open.type = 'button'; open.textContent = 'Open';
-            open.disabled = !documentRecord.offline;
-            open.title = documentRecord.offline ? 'Open the saved offline PDF' : 'Reselect the original PDF to open it';
-            open.addEventListener('click', () => openOfflineDocument(documentRecord.key));
+            open.title = documentRecord.offline ? 'Open the saved offline PDF' : 'Open saved reading data and select the original PDF when ready';
+            open.addEventListener('click', () => openGalleryDocument(documentRecord));
             const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Delete'; remove.addEventListener('click', () => removeDocument(documentRecord.key));
-            item.append(info, collect, open, remove); libraryList.append(item);
+            const actions = document.createElement('div'); actions.className = 'library-item-actions';
+            actions.append(open, collect, remove); item.append(info, actions); libraryList.append(item);
           });
         } catch { /* Library storage is optional. */ }
+      }
+
+      async function openGalleryDocument(documentRecord) {
+        documentSetup.hidden = false;
+        fileName.textContent = documentRecord.fileName;
+        currentDocumentKey = documentRecord.key;
+        const stored = await getLocalRecord('extractions', documentRecord.key).catch(() => null);
+        if (stored) {
+          text.value = stored.text || '';
+          preparedParagraphs = stored.paragraphs || [];
+          allPreparedParagraphs = stored.allParagraphs || preparedParagraphs;
+          lastFilterSummary = stored.filterSummary;
+          readDocument.disabled = !documentRecord.offline;
+          pdfStatus.textContent = documentRecord.offline
+            ? 'Saved extraction ready. Open this PDF in the reader.'
+            : 'Saved extraction, bookmarks, and highlights are ready. Select the original PDF to render it again.';
+        }
+        if (documentRecord.offline) await openOfflineDocument(documentRecord.key);
       }
 
       function currentSection(index = readerCurrentIndex) {
@@ -914,6 +981,7 @@
         currentDocumentFile = file;
         pendingResume = undefined;
         fileName.textContent = file.name;
+        documentSetup.hidden = false;
         extract.disabled = false;
         readDocument.disabled = true;
         preparedParagraphs = [];
@@ -1075,8 +1143,9 @@
           if (renderVersion !== pdfRenderVersion) return;
           for (const paragraph of paragraphsByPage.get(pageNumber) || []) {
             const {box} = paragraph;
-            const overlay = document.createElement('button');
-            overlay.type = 'button';
+            const overlay = document.createElement('div');
+            overlay.tabIndex = 0;
+            overlay.setAttribute('role', 'button');
             overlay.className = 'pdf-paragraph';
             overlay.dataset.sourceId = paragraph.id;
             overlay.title = 'Read from this paragraph';
@@ -1085,6 +1154,18 @@
             overlay.style.width = `${((box.bbox.r - box.bbox.l) / box.page_size.width) * 100}%`;
             overlay.style.height = `${((box.bbox.t - box.bbox.b) / box.page_size.height) * 100}%`;
             overlay.addEventListener('click', () => jumpToSource(paragraph.id));
+            overlay.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); jumpToSource(paragraph.id); } });
+            const tools = document.createElement('span');
+            tools.className = 'paragraph-tools';
+            const addTool = (label, title, action) => {
+              const tool = document.createElement('button'); tool.type = 'button'; tool.textContent = label; tool.title = title;
+              tool.addEventListener('click', event => { event.stopPropagation(); jumpToSource(paragraph.id); action(); });
+              tools.append(tool);
+            };
+            addTool('▶', 'Read from here', () => {});
+            addTool('☆', 'Bookmark paragraph', () => createBookmark());
+            addTool('✦', 'Highlight and add a note', () => createAnnotation());
+            overlay.append(tools);
             pageElement.append(overlay);
           }
           renderedPages.append(pageElement);
@@ -1145,7 +1226,9 @@
             : statuses.includes('ready') ? 'ready'
             : statuses.length && statuses.every(item => item === 'played') ? 'played' : 'queued';
           const annotated = readerAnnotations.some(annotation => annotation.sourceId === overlay.dataset.sourceId);
-          overlay.className = `pdf-paragraph status-${status}${annotated ? ' annotated' : ''}`;
+          const query = normaliseSearchText(readerSearch.value || '');
+          const matching = !query || sourceItems.some(item => normaliseSearchText(item.text).includes(query));
+          overlay.className = `pdf-paragraph status-${status}${annotated ? ' annotated' : ''}${matching ? '' : ' search-filtered'}`;
         });
       }
 
@@ -1278,6 +1361,20 @@
         openDrawer('Bookmarks', items, 'No bookmarks saved for this PDF.');
       }
 
+      function showAnnotations() {
+        const sourceIndices = new Map(readerItems.map((item, index) => [item.sourceId, index]));
+        const items = readerAnnotations.map(annotation => {
+          const button = document.createElement('button');
+          button.type = 'button'; button.className = 'drawer-item';
+          const index = sourceIndices.get(annotation.sourceId);
+          button.textContent = annotation.note || annotation.excerpt || 'Highlight';
+          const meta = document.createElement('span'); meta.className = 'drawer-meta'; meta.textContent = index === undefined ? 'Source paragraph is unavailable' : `Paragraph ${index + 1}`;
+          button.append(meta); button.addEventListener('click', () => { if (index !== undefined) jumpToParagraph(index); });
+          return button;
+        });
+        openDrawer('Highlights and notes', items, 'Highlights and notes you add on the PDF appear here.');
+      }
+
       function updateSearchResults() {
         const query = normaliseSearchText(readerSearch.value);
         readerSearchResults = query ? readerItems.flatMap((item, index) => normaliseSearchText(item.text).includes(query) ? [{index, item}] : []) : [];
@@ -1286,6 +1383,8 @@
         readerSearchPrev.disabled = !readerSearchResults.length;
         readerSearchNext.disabled = !readerSearchResults.length;
         renderTranscript();
+        refreshPdfHighlights();
+        if (query) moveSearchResult(0);
       }
 
       function moveSearchResult(change) {
@@ -1454,6 +1553,12 @@
           preparedParagraphs = result.paragraphs || [];
           allPreparedParagraphs = result.all_paragraphs || preparedParagraphs;
           lastFilterSummary = result.filter_summary;
+          if (currentDocumentKey) {
+            await putLocalRecord('extractions', {
+              key: currentDocumentKey, text: result.text, paragraphs: preparedParagraphs,
+              allParagraphs: allPreparedParagraphs, filterSummary: lastFilterSummary, updatedAt: new Date().toISOString(),
+            });
+          }
           if (pdfUrl) URL.revokeObjectURL(pdfUrl);
           readerTitle.textContent = file.name;
           readDocument.disabled = !text.value.trim();
@@ -1462,6 +1567,7 @@
             ? filterSummaryMessage(lastFilterSummary)
             : 'Text is ready (this fallback does not expose PDF paragraph geometry).';
           pdfStatus.textContent = `Loaded ${file.name}. ${summary} If the text order is wrong, choose a different engine and extract again.`;
+          readDocument.click();
         } catch (error) {
           pdfStatus.textContent = error.message;
         } finally {
@@ -1530,6 +1636,7 @@
         readerBookmark.disabled = !currentDocumentKey;
         readerBookmarksButton.disabled = !currentDocumentKey;
         readerAnnotate.disabled = !currentDocumentKey;
+        readerAnnotationsButton.disabled = !currentDocumentKey;
         readerReview.disabled = !currentDocumentKey;
         readerListenOnly.disabled = false;
         readerExportParagraph.disabled = false;
@@ -1609,6 +1716,7 @@
         try { readerBookmarks = await listBookmarks(); showBookmarks(); }
         catch (error) { readerStatus.textContent = error.message; }
       });
+      readerAnnotationsButton.addEventListener('click', showAnnotations);
       readerSearch.addEventListener('input', updateSearchResults);
       readerSearchNext.addEventListener('click', () => moveSearchResult(1));
       readerSearchPrev.addEventListener('click', () => moveSearchResult(-1));

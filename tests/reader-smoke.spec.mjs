@@ -56,9 +56,8 @@ test('extracts, starts the reader, jumps, persists resume, and preserves zoom co
   try {
     await page.goto(`http://127.0.0.1:${port}/`);
     await page.locator('#pdf').setInputFiles({name: 'smoke.pdf', mimeType: 'application/pdf', buffer: PDF});
-    await page.getByRole('button', {name: 'Extract text'}).click();
+    await page.getByRole('button', {name: 'Extract and read'}).click();
     await expect(page.locator('#pdf-status')).toContainText('1 reading paragraphs ready');
-    await page.getByRole('button', {name: 'Read full screen'}).click();
     await expect(page.locator('#reader')).toBeVisible();
     await expect(page.locator('.pdf-paragraph[data-source-id="p1"]')).toBeVisible();
     await page.locator('.pdf-paragraph[data-source-id="p1"]').click();
