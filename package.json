@@ -2,9 +2,13 @@
   "name": "pdfreader",
   "private": true,
   "scripts": {
-    "sync-pdfjs": "node scripts/sync_pdfjs.mjs"
+    "sync-pdfjs": "node scripts/sync_pdfjs.mjs",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "pdfjs-dist": "6.2.108"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
   }
 }

@@ -32,3 +32,7 @@ jobs:
           python -m py_compile local_webui.py
           python -m unittest discover -s tests
           node -e "const fs=require('fs'); const html=fs.readFileSync('local_webui.html','utf8'); const script=html.match(/<script>([\\s\\S]*)<\\/script>/)?.[1]; if (!script) throw new Error('script not found'); new Function(script);"
+      - name: Run browser smoke test
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:browser
