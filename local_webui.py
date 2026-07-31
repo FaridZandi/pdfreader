@@ -112,7 +112,6 @@ def _looks_like_reference_entry(paragraph: dict[str, object]) -> bool:
 
 def annotate_filter_reasons(paragraphs: list[dict[str, object]]) -> list[dict[str, object]]:
     """Attach transparent, deterministic prose-filter reasons to source blocks."""
-    repeated_edge_text: set[str] = set()
     occurrences: dict[str, set[int]] = {}
     for paragraph in paragraphs:
         page = _primary_page(paragraph)
@@ -515,7 +514,9 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
                 return
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= MAX_TEXT_LENGTH + 200:
+                # Content-Length counts encoded JSON bytes, so allow for escapes
+                # and multi-byte characters before the text-length check below.
+                if not 0 < length <= MAX_TEXT_LENGTH * 6 + 200:
                     raise ValueError("Request is too large.")
                 payload = json.loads(self.rfile.read(length))
                 text = str(payload.get("text", "")).strip()
@@ -546,7 +547,7 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
         def _export_audio(self) -> None:
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= MAX_EXPORT_CHARACTERS * 2:
+                if not 0 < length <= MAX_EXPORT_CHARACTERS * 6 + 4096:
                     raise ValueError("Export request is too large.")
                 payload = json.loads(self.rfile.read(length))
                 chunks = [str(item).strip() for item in payload.get("chunks", [])]

@@ -3,5 +3,7 @@
 node_modules/
 webui_static/pdfjs/
 tmp/
+test-results/
+playwright-report/
 __pycache__/
 *.py[cod]
