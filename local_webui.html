@@ -52,9 +52,10 @@
       .pdf-page canvas { display: block; }
       button.pdf-paragraph { position: absolute; min-height: 0; border: 1px solid transparent; border-radius: 3px; background: #0000; cursor: pointer; }
       button.pdf-paragraph:hover { border-color: #a78bf0; background: #a78bf014; }
-      button.pdf-paragraph.status-converting { border-color: #d6a833; border-style: dashed; background: transparent; }
-      button.pdf-paragraph.status-ready, button.pdf-paragraph.status-played { border-color: #6caa8588; background: transparent; }
-      button.pdf-paragraph.status-playing { border-color: transparent; background: transparent; }
+      button.pdf-paragraph.status-converting { border-color: #d6a833; border-style: dashed; background: #ffba871f; }
+      button.pdf-paragraph.status-ready { border-color: #6caa8588; background: #00ff3814; }
+      button.pdf-paragraph.status-played { border-color: #6caa8588; background: transparent; }
+      button.pdf-paragraph.status-playing { border-color: transparent; background: #0010ff14; }
       button.pdf-paragraph.status-playing::before { content: ''; position: absolute; top: -6px; bottom: -6px; left: -13px; width: 5px; border-radius: 999px; background: #6544b8; box-shadow: 0 1px 5px #6544b899; pointer-events: none; }
       button.pdf-paragraph.status-playing::after { content: ''; position: absolute; inset: -5px; border: 2px solid #6544b8; border-radius: 7px; box-shadow: 0 0 0 4px #6544b820; pointer-events: none; }
       .reader-panel { min-height: 0; display: flex; flex-direction: column; border-left: 1px solid #4d405a; background: #201827; }
