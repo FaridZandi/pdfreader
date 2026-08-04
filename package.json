@@ -4,7 +4,9 @@
   "scripts": {
     "sync-pdfjs": "node scripts/sync_pdfjs.mjs",
     "test:browser": "playwright test",
-    "print-url": "node scripts/print_url.mjs"
+    "print-url": "node scripts/print_url.mjs",
+    "test:unit": "node --test \"tests/unit/*.test.mjs\"",
+    "check": "for f in webui/app.mjs webui/lib/*.mjs scripts/*.mjs tests/*.spec.mjs tests/unit/*.test.mjs; do node --check \"$f\" || exit 1; done"
   },
   "dependencies": {
     "pdfjs-dist": "6.2.108",

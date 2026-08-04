@@ -37,17 +37,27 @@ const PARAGRAPHS = [
   paragraph('p2', 'A second paragraph to resume from.', 1000, 970),
 ];
 
+const CONTENT_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+};
+
+// Mirrors the asset routes the real server exposes.
+function localPathFor(requestPath) {
+  if (requestPath.startsWith('/static/')) return `/webui_static/${requestPath.slice('/static/'.length)}`;
+  if (requestPath.startsWith('/app/')) return `/webui/${requestPath.slice('/app/'.length)}`;
+  return requestPath;
+}
+
 async function startStaticServer() {
   const server = createServer(async (request, response) => {
     const requestPath = request.url === '/' ? '/local_webui.html' : request.url.split('?')[0];
-    const localPath = requestPath.startsWith('/static/')
-      ? `/webui_static/${requestPath.slice('/static/'.length)}` : requestPath;
-    const target = normalize(join(ROOT, localPath));
+    const target = normalize(join(ROOT, localPathFor(requestPath)));
     if (!target.startsWith(ROOT)) { response.writeHead(404).end(); return; }
     try {
       const body = await readFile(target);
-      const type = extname(target) === '.html' ? 'text/html; charset=utf-8'
-        : extname(target) === '.mjs' ? 'text/javascript; charset=utf-8' : 'application/octet-stream';
+      const type = CONTENT_TYPES[extname(target)] || 'application/octet-stream';
       response.writeHead(200, {'content-type': type}).end(body);
     } catch { response.writeHead(404).end(); }
   });

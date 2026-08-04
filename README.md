@@ -69,4 +69,28 @@ npm run sync-pdfjs
 ./scripts/run.sh
 ```
 
-The application source lives in `local_webui.py` and `local_webui.html`. Kokoro is intentionally not vendored or modified in this repository; it is installed as a pinned dependency from its upstream project.
+Source layout:
+
+| Path | Contents |
+| --- | --- |
+| `local_webui.py` | the localhost server: extraction, speech, export, URL fetching |
+| `local_webui.html` | markup and the icon sprite only |
+| `webui/app.css` | the whole stylesheet, driven by tokens at the top |
+| `webui/app.mjs` | reader playback, import, dialogs, and the wiring between the parts |
+| `webui/lib/text.mjs` | pure text and reading-queue helpers, unit tested |
+| `webui/lib/db.mjs` | the IndexedDB schema and every record operation |
+| `webui/lib/pdf-view.mjs` | rendered pages, zoom, and the paragraph overlays |
+| `webui/lib/library.mjs` | the gallery: cards, collections, deletion |
+| `webui/lib/drawer.mjs` | the reader's outline, text and highlight views, and search |
+| `webui_static/pdfjs/` | vendored PDF.js, synced from npm and not edited |
+
+The server exposes `webui/` at `/app/` and `webui_static/` at `/static/`. Application sources are served with `no-store`, so a browser refresh picks up a change to the markup, stylesheet or scripts; changing `local_webui.py` needs the server restarted.
+
+```bash
+npm run check       # syntax-check every JavaScript file
+npm run test:unit   # node:test, no browser needed
+npm run test:browser
+python -m unittest discover -s tests
+```
+
+Kokoro is intentionally not vendored or modified in this repository; it is installed as a pinned dependency from its upstream project.

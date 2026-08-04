@@ -33,7 +33,15 @@ if TYPE_CHECKING:
 
 ROOT = Path(__file__).resolve().parent
 PAGE = ROOT / "local_webui.html"
+# Vendored browser runtime, kept apart from the hand-written application.
 STATIC_ROOT = ROOT / "webui_static"
+APP_ROOT = ROOT / "webui"
+ASSET_ROOTS = {"/static/": STATIC_ROOT, "/app/": APP_ROOT}
+CONTENT_TYPES = {
+    ".mjs": "text/javascript; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+}
 DOCLING = Path(sys.executable).with_name("docling")
 PRINT_URL = ROOT / "scripts" / "print_url.mjs"
 FETCH_TIMEOUT = 30
@@ -565,7 +573,7 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
             path = urlparse(self.path).path
-            if path.startswith("/static/"):
+            if any(path.startswith(prefix) for prefix in ASSET_ROOTS):
                 self._serve_static(path)
                 return
             if path not in ("/", "/index.html"):
@@ -580,16 +588,24 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
             self.wfile.write(body)
 
         def _serve_static(self, request_path: str) -> None:
-            target = (STATIC_ROOT / request_path.removeprefix("/static/")).resolve()
-            if STATIC_ROOT not in target.parents or not target.is_file():
+            for prefix, root in ASSET_ROOTS.items():
+                if request_path.startswith(prefix):
+                    break
+            else:
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            target = (root / request_path.removeprefix(prefix)).resolve()
+            if root not in target.parents or not target.is_file():
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
             body = target.read_bytes()
-            content_type = "text/javascript; charset=utf-8" if target.suffix == ".mjs" else "application/octet-stream"
             self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Type", CONTENT_TYPES.get(target.suffix, "application/octet-stream"))
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+            # Application sources change during development; only the vendored
+            # runtime is safe to cache indefinitely.
+            immutable = root is STATIC_ROOT
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable" if immutable else "no-store")
             self.end_headers()
             self.wfile.write(body)
 

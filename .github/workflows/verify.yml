@@ -30,9 +30,12 @@ jobs:
       - name: Check application syntax
         run: |
           python -m py_compile local_webui.py
+          npm run check
+      - name: Run unit tests
+        run: |
           python -m unittest discover -s tests
-          node -e "const fs=require('fs'); const html=fs.readFileSync('local_webui.html','utf8'); const script=html.match(/<script>([\\s\\S]*)<\\/script>/)?.[1]; if (!script) throw new Error('script not found'); new Function(script);"
-      - name: Run browser smoke test
+          npm run test:unit
+      - name: Run browser tests
         run: |
           npx playwright install --with-deps chromium
           npm run test:browser
