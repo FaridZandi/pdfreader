@@ -319,6 +319,7 @@
       <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><path d="M4 15h3v5H5.5A1.5 1.5 0 0 1 4 18.5zm16 0h-3v5h1.5a1.5 1.5 0 0 0 1.5-1.5z"/></symbol>
       <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14"/></symbol>
       <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zm0 0v5h5"/></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.6-2.6a4 4 0 0 0-5.7-5.7l-1.4 1.4"/><path d="M13.5 10.5a4 4 0 0 0-5.7 0l-2.6 2.6a4 4 0 0 0 5.7 5.7l1.4-1.4"/></symbol>
       <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.7 9.5a2.4 2.4 0 1 1 2.8 2.7v1.3"/><path d="M12.5 16.7h.01"/></symbol>
       <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V6m0 0-5 5m5-5 5 5"/></symbol>
       <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v13m0 0 5-5m-5 5-5-5"/></symbol>
@@ -328,8 +329,9 @@
       <header class="home-header">
         <div>
           <h1>PDF Reader</h1>
-          <p class="subtitle">Your local reading desk — nothing leaves this computer.</p>
+          <p class="subtitle">Your local reading desk — your documents stay on this computer.</p>
         </div>
+        <button id="load-url" class="btn btn-ghost" type="button"><svg><use href="#i-link"/></svg>From URL</button>
         <button id="choose-pdf" class="btn btn-primary" type="button"><svg><use href="#i-plus"/></svg>Add PDF</button>
         <input id="pdf" type="file" accept="application/pdf,.pdf" hidden>
       </header>
@@ -494,6 +496,7 @@
       const skipBracketedText = document.querySelector('#skip-bracketed-text');
       const pdf = document.querySelector('#pdf');
       const choosePdf = document.querySelector('#choose-pdf');
+      const loadUrl = document.querySelector('#load-url');
       const fileName = document.querySelector('#file-name');
       const documentSetup = document.querySelector('#document-setup');
       const importCancel = document.querySelector('#import-cancel');
@@ -731,6 +734,18 @@
         return true;
       }
 
+      // Server errors carry {"error"}, but a 404 comes from http.server itself
+      // as HTML - which means the running server predates this page and has to
+      // be restarted. Say so rather than reporting a generic failure.
+      async function requestError(response, fallback) {
+        const body = await response.json().catch(() => null);
+        if (body?.error) return new Error(body.error);
+        if (response.status === 404) {
+          return new Error(`${fallback} The running server does not have this endpoint — restart it with ./scripts/run.sh.`);
+        }
+        return new Error(`${fallback} (HTTP ${response.status})`);
+      }
+
       function normaliseSearchText(value) {
         return value.replace(/\s+/g, ' ').trim().toLocaleLowerCase();
       }
@@ -775,17 +790,22 @@
         });
       }
 
-      function openEntryDialog({title, description, name = '', note = '', withNote = true, confirmLabel = 'Save', onSave}) {
+      function openEntryDialog({
+        title, description, name = '', withName = Boolean(name), namePlaceholder = 'Name',
+        note = '', withNote = true, confirmLabel = 'Save', onSave,
+      }) {
         entryTitle.textContent = title;
         entryDescription.textContent = description;
         entryName.value = name;
-        entryName.hidden = !name;
+        entryName.placeholder = namePlaceholder;
+        entryName.setAttribute('aria-label', namePlaceholder);
+        entryName.hidden = !withName;
         entryNote.value = note;
         entryNote.hidden = !withNote;
         entryConfirm.textContent = confirmLabel;
         entryDialog.hidden = false;
         entrySubmit = onSave;
-        (name ? entryName : withNote ? entryNote : entryConfirm).focus();
+        (withName ? entryName : withNote ? entryNote : entryConfirm).focus();
       }
 
       function closeEntryDialog() {
@@ -1357,10 +1377,7 @@
             body: JSON.stringify({chunks, speed: Number(readerPlaybackSpeed.value)}),
             signal: exportAbortController.signal,
           });
-          if (!response.ok) {
-            const message = await response.json().catch(() => ({}));
-            throw new Error(message.error || 'Could not export audio.');
-          }
+          if (!response.ok) throw await requestError(response, 'Could not export audio.');
           const url = URL.createObjectURL(await response.blob());
           const link = document.createElement('a');
           link.href = url; link.download = `${readerTitle.textContent.replace(/\.pdf$/i, '')}-${scope}.wav`;
@@ -1398,6 +1415,7 @@
       renderLibrary();
 
       choosePdf.addEventListener('click', () => pdf.click());
+      loadUrl.addEventListener('click', askForUrl);
       importChoose.addEventListener('click', () => pdf.click());
       function cancelImport() {
         pdf.value = '';
@@ -1409,9 +1427,9 @@
 
       importCancel.addEventListener('click', cancelImport);
       importClose.addEventListener('click', cancelImport);
-      pdf.addEventListener('change', async () => {
-        const file = pdf.files[0];
-        if (!file) return;
+      // Shared by picking a local file and by loading a URL. Assigning
+      // input.files fires no change event, so the URL path calls this directly.
+      async function beginImport(file) {
         const selectionVersion = ++documentSelectionVersion;
         currentDocumentKey = undefined;
         currentDocumentFile = file;
@@ -1449,7 +1467,49 @@
         } catch {
           if (selectionVersion === documentSelectionVersion) pdfStatus.textContent = 'PDF selected. Choose extraction options to add it to your library.';
         }
-      });
+      }
+
+      pdf.addEventListener('change', () => { if (pdf.files[0]) beginImport(pdf.files[0]); });
+
+      function askForUrl() {
+        openEntryDialog({
+          title: 'Load from a web address',
+          description: 'A link to a PDF is downloaded. Any other page is printed to a PDF first. This is the one action that reaches the internet.',
+          withName: true,
+          namePlaceholder: 'https://example.com/paper.pdf',
+          withNote: false,
+          confirmLabel: 'Load',
+          onSave: ({name}) => importFromUrl(name),
+        });
+      }
+
+      async function importFromUrl(url) {
+        if (!url) return;
+        cancelImport();
+        fileName.textContent = url;
+        documentSetup.hidden = false;
+        extract.disabled = true;
+        pdfStatus.textContent = 'Fetching that address…';
+        try {
+          const response = await fetch('/api/fetch-url', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url}),
+          });
+          if (!response.ok) throw await requestError(response, 'Could not load that address.');
+          const name = decodeURIComponent(response.headers.get('X-Document-Name') || 'page.pdf');
+          const file = new File([await response.blob()], name, {type: 'application/pdf'});
+          // From here it is an ordinary import, so the reader, the gallery and
+          // the resume record all treat it exactly like a chosen file.
+          const transfer = new DataTransfer();
+          transfer.items.add(file);
+          pdf.files = transfer.files;
+          await beginImport(file);
+        } catch (error) {
+          extract.disabled = true;
+          pdfStatus.textContent = error.message;
+        }
+      }
 
       function splitDocumentParagraphs(value) {
         return value.split(/\n\s*\n+/).map(item => item.replace(/\s+/g, ' ').trim()).filter(Boolean);
@@ -1531,10 +1591,7 @@
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({text: speechText, speed: rate})
         });
-        if (!response.ok) {
-          const message = await response.json().catch(() => ({}));
-          throw new Error(message.error || 'Could not generate audio.');
-        }
+        if (!response.ok) throw await requestError(response, 'Could not generate audio.');
         return response.blob();
       }
 
@@ -2109,8 +2166,8 @@
             },
             body: file
           });
+          if (!response.ok) throw await requestError(response, 'Could not extract the PDF.');
           const result = await response.json();
-          if (!response.ok) throw new Error(result.error || 'Could not extract the PDF.');
           preparedText = result.text;
           preparedParagraphs = result.paragraphs || [];
           allPreparedParagraphs = result.all_paragraphs || preparedParagraphs;

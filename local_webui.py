@@ -21,7 +21,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
+from urllib.error import URLError
+from urllib.parse import quote, unquote, urlparse
+from urllib.request import Request, urlopen
 
 import numpy as np
 
@@ -33,6 +35,10 @@ ROOT = Path(__file__).resolve().parent
 PAGE = ROOT / "local_webui.html"
 STATIC_ROOT = ROOT / "webui_static"
 DOCLING = Path(sys.executable).with_name("docling")
+PRINT_URL = ROOT / "scripts" / "print_url.mjs"
+FETCH_TIMEOUT = 30
+PRINT_TIMEOUT = 120
+MAX_URL_LENGTH = 2_048
 SAMPLE_RATE = 24_000
 MAX_TEXT_LENGTH = 4_000
 MAX_EXPORT_CHARACTERS = 250_000
@@ -431,6 +437,70 @@ def extract_pdf_text(
     }
 
 
+def _document_name(value: str, fallback: str) -> str:
+    """Turn a URL tail or page title into a safe, readable file name."""
+    name = re.sub(r"[\\/:*?\"<>|\x00-\x1f]", " ", unquote(value)).strip()
+    name = re.sub(r"\s+", " ", name)[:120].strip() or fallback
+    return name if name.lower().endswith(".pdf") else f"{name}.pdf"
+
+
+def _name_from_url(url: str) -> str:
+    parsed = urlparse(url)
+    tail = parsed.path.rsplit("/", 1)[-1]
+    return _document_name(tail or parsed.netloc, "document.pdf")
+
+
+def print_url_as_pdf(url: str) -> tuple[bytes, str]:
+    """Render a web page to PDF with the browser Playwright manages."""
+    if not PRINT_URL.exists():
+        raise ValueError("The web page printer is missing from this checkout.")
+    temporary_root = ROOT / "tmp" / "pages"
+    temporary_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=temporary_root) as directory:
+        output = Path(directory) / "page.pdf"
+        result = subprocess.run(
+            ["node", str(PRINT_URL), url, str(output)],
+            capture_output=True,
+            timeout=PRINT_TIMEOUT,
+            check=False,
+            cwd=str(ROOT),
+        )
+        if result.returncode or not output.exists():
+            message = result.stderr.decode("utf-8", errors="replace").strip()
+            raise ValueError(message or "That page could not be printed to PDF.")
+        try:
+            title = str(json.loads(result.stdout.decode("utf-8", errors="replace")).get("title", ""))
+        except (ValueError, AttributeError):
+            title = ""
+        return output.read_bytes(), _document_name(title, urlparse(url).netloc or "page.pdf")
+
+
+def fetch_url_as_pdf(url: str, printer: Callable[[str], tuple[bytes, str]] = print_url_as_pdf) -> tuple[bytes, str]:
+    """Download a PDF, or print the page at that address to one."""
+    url = url.strip()
+    if len(url) > MAX_URL_LENGTH:
+        raise ValueError("That web address is too long.")
+    parsed = urlparse(url)
+    # Only web addresses: this keeps the fetch away from file:// and friends.
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError("Enter an http:// or https:// address.")
+    request = Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; pdfreader/1.0)"})
+    try:
+        with urlopen(request, timeout=FETCH_TIMEOUT) as response:  # noqa: S310 - scheme checked above
+            payload = response.read(MAX_PDF_SIZE + 1)
+            final_url = response.geturl()
+    except (URLError, OSError, ValueError) as error:
+        raise ValueError(f"Could not open that address: {error}") from error
+    if len(payload) > MAX_PDF_SIZE:
+        raise ValueError("That document is larger than 50 MB.")
+    if not payload:
+        raise ValueError("That address returned an empty response.")
+    # Sniff the bytes rather than trusting Content-Type, which is often wrong.
+    if b"%PDF-" in payload[:1024]:
+        return payload, _name_from_url(final_url)
+    return printer(url)
+
+
 class KokoroApp:
     def __init__(self) -> None:
         # Keep model downloads inside this checkout unless the user overrides it.
@@ -530,6 +600,9 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
             if self.path == "/api/export-audio":
                 self._export_audio()
                 return
+            if self.path == "/api/fetch-url":
+                self._fetch_url()
+                return
             if self.path != "/api/synthesize":
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
@@ -597,6 +670,35 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "audio/wav")
             self.send_header("Content-Disposition", 'attachment; filename="pdf-reader-export.wav"')
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _fetch_url(self) -> None:
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= MAX_URL_LENGTH * 4:
+                    raise ValueError("Request is too large.")
+                payload = json.loads(self.rfile.read(length))
+                url = str(payload.get("url", "")).strip()
+                if not url:
+                    raise ValueError("Enter a web address.")
+                body, filename = fetch_url_as_pdf(url)
+            except (ValueError, json.JSONDecodeError) as error:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+                return
+            except subprocess.TimeoutExpired:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "That page took too long to print."})
+                return
+            except Exception as error:
+                self.log_error("URL fetch failed: %s", error)
+                self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(error)})
+                return
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/pdf")
+            # Percent-encoded so a non-ASCII title survives the header.
+            self.send_header("X-Document-Name", quote(filename))
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()

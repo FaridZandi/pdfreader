@@ -12,3 +12,5 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 npm ci
 npm run sync-pdfjs
+# Chromium prints web pages to PDF for the "From URL" import.
+npx playwright install chromium

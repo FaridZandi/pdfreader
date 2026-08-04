@@ -3,12 +3,11 @@
   "private": true,
   "scripts": {
     "sync-pdfjs": "node scripts/sync_pdfjs.mjs",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "print-url": "node scripts/print_url.mjs"
   },
   "dependencies": {
-    "pdfjs-dist": "6.2.108"
-  },
-  "devDependencies": {
+    "pdfjs-dist": "6.2.108",
     "@playwright/test": "^1.62.1"
   }
 }

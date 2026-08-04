@@ -2,7 +2,9 @@
 
 A local PDF read-aloud application. It uses [Kokoro](https://github.com/hexgrad/kokoro) for speech, [Docling](https://github.com/docling-project/docling) for structured PDF extraction, and PDF.js for the interactive page view.
 
-Nothing is uploaded by the application: the web server binds only to `127.0.0.1`, PDF conversion runs locally, and Kokoro runs locally. The first run may download the upstream model files into `.hf-cache/`.
+Your documents are never uploaded: the web server binds only to `127.0.0.1`, PDF conversion runs locally, and Kokoro runs locally. The first run may download the upstream model files into `.hf-cache/`.
+
+**From URL** is the one feature that reaches the internet, and only for the address you type. The server downloads that address; if it is not already a PDF, a headless Chromium loads the page and prints it to one, which runs that page's scripts as any browser would. Only `http://` and `https://` addresses are accepted, and the download is capped at 50 MB. Nothing about your library is sent anywhere.
 
 ## Setup
 
@@ -18,7 +20,7 @@ cd pdfreader
 PYTHON_BIN=python3.11 ./scripts/setup.sh
 ```
 
-`setup.sh` creates `.venv`, installs the pinned upstream Kokoro and Docling dependencies, installs PDF.js from npm, and copies only the browser assets required at runtime.
+`setup.sh` creates `.venv`, installs the pinned upstream Kokoro and Docling dependencies, installs PDF.js from npm, copies only the browser assets required at runtime, and downloads the Chromium that **From URL** uses to print web pages (roughly 150 MB). Skip that last step with `npx playwright install chromium` omitted if you only ever open local files; the rest of the application works without it, and **From URL** will explain what is missing.
 
 ## Run
 
@@ -32,7 +34,7 @@ For PDFs with selectable text, choose **Docling text-only (no OCR)** for a faste
 
 ## Reading controls and local storage
 
-**Add PDF** imports a document once: it stores the file in the browser gallery, renders a first-page preview, and extracts the text. Everything after that happens locally against the stored copy. Choose a **reading preset** in the import panel, and an **extraction engine** under **Advanced extraction**:
+**Add PDF** imports a document once: it stores the file in the browser gallery, renders a first-page preview, and extracts the text. **From URL** takes a web address instead: a link to a PDF is downloaded, and any other page is printed to a PDF first so the reader still has real pages to show and real geometry to highlight. Either way the result then follows the same path, and everything after that happens locally against the stored copy. Choose a **reading preset** in the import panel, and an **extraction engine** under **Advanced extraction**:
 
 - **Prose only** filters repeated running headers/footers, figure labels, isolated tokens, captions, and reference material from the reading queue.
 - **Prose + captions** retains captions while applying the other prose filters.

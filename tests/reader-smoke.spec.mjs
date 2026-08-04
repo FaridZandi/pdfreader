@@ -257,6 +257,59 @@ test.describe('local reader', () => {
     expect(await page.locator('#reader-player').evaluate(player => player.paused)).toBe(true);
   });
 
+  test('loading a URL imports the fetched PDF like a chosen file', async ({ page }) => {
+    await loadHome(page, port);
+    await page.route('**/api/fetch-url', async (route, request) => {
+      expect(JSON.parse(request.postData())).toEqual({url: 'https://example.com/article'});
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'content-type': 'application/pdf',
+          'x-document-name': encodeURIComponent('A Printed Page.pdf'),
+        },
+        body: PDF,
+      });
+    });
+    await page.getByRole('button', {name: 'From URL'}).click();
+    await page.locator('#entry-name').fill('https://example.com/article');
+    await page.getByRole('button', {name: 'Load'}).click();
+    // From here it is the ordinary import panel, named after the fetched file.
+    await expect(page.locator('#document-setup')).toBeVisible();
+    await expect(page.locator('#file-name')).toHaveText('A Printed Page.pdf');
+    await page.getByRole('button', {name: 'Add and open'}).click();
+    await expect(page.locator('#reader')).toBeVisible();
+    await expect(page.locator('#reader-title')).toHaveText('A Printed Page.pdf');
+    await page.getByRole('button', {name: 'Library', exact: true}).click();
+    await expect(page.locator('.doc-name')).toHaveText('A Printed Page.pdf');
+  });
+
+  test('a URL that cannot be loaded reports why', async ({ page }) => {
+    await loadHome(page, port);
+    await page.route('**/api/fetch-url', route => route.fulfill({
+      status: 400,
+      json: {error: 'Enter an http:// or https:// address.'},
+    }));
+    await page.getByRole('button', {name: 'From URL'}).click();
+    await page.locator('#entry-name').fill('file:///etc/passwd');
+    await page.getByRole('button', {name: 'Load'}).click();
+    await expect(page.locator('#pdf-status')).toContainText('Enter an http:// or https:// address.');
+    await expect(page.getByRole('button', {name: 'Add and open'})).toBeDisabled();
+  });
+
+  test('a server without the endpoint says to restart it', async ({ page }) => {
+    await loadHome(page, port);
+    // What http.server itself returns for an unknown path: HTML, not JSON.
+    await page.route('**/api/fetch-url', route => route.fulfill({
+      status: 404,
+      contentType: 'text/html;charset=utf-8',
+      body: '<!DOCTYPE HTML><html><body>Error 404: Not Found</body></html>',
+    }));
+    await page.getByRole('button', {name: 'From URL'}).click();
+    await page.locator('#entry-name').fill('https://example.com/article');
+    await page.getByRole('button', {name: 'Load'}).click();
+    await expect(page.locator('#pdf-status')).toContainText('restart it with ./scripts/run.sh');
+  });
+
   test('moving the reading position scrolls the PDF to it', async ({ page }) => {
     await openReaderPage(page, port);
     // The page has to be rendered before it can be scrolled anywhere.
