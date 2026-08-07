@@ -1,105 +1,23 @@
 import { test, expect } from '@playwright/test';
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
 
-const ROOT = new URL('../', import.meta.url).pathname;
-const PDF = Buffer.from(`%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 1200] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj
-4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
-5 0 obj << /Length 58 >> stream
-BT /F1 18 Tf 72 1080 Td (Local reader smoke test.) Tj ET
-endstream endobj
-xref
-0 6
-0000000000 65535 f\x20
-0000000009 00000 n\x20
-0000000058 00000 n\x20
-0000000115 00000 n\x20
-0000000250 00000 n\x20
-0000000320 00000 n\x20
-trailer << /Size 6 /Root 1 0 R >>
-startxref
-428
-%%EOF`);
+import {
+  loadHome,
+  openReaderPage,
+  paragraph,
+  PDF,
+  selectPdf,
+  silentWav,
+  startStaticServer,
+} from './helpers/reader.mjs';
 
-function paragraph(id, text, top, bottom) {
-  return {
-    id, text, label: 'text', page: 1,
-    boxes: [{page: 1, bbox: {l: 72, t: top, r: 300, b: bottom}, page_size: {width: 612, height: 1200}}],
-  };
-}
-
-const PARAGRAPHS = [
-  paragraph('p1', 'Local reader smoke test.', 1080, 1050),
-  paragraph('p2', 'A second paragraph to resume from.', 1000, 970),
-];
-
-const CONTENT_TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-};
-
-// Mirrors the asset routes the real server exposes.
-function localPathFor(requestPath) {
-  if (requestPath.startsWith('/static/')) return `/webui_static/${requestPath.slice('/static/'.length)}`;
-  if (requestPath.startsWith('/app/')) return `/webui/${requestPath.slice('/app/'.length)}`;
-  return requestPath;
-}
-
-async function startStaticServer() {
-  const server = createServer(async (request, response) => {
-    const requestPath = request.url === '/' ? '/local_webui.html' : request.url.split('?')[0];
-    const target = normalize(join(ROOT, localPathFor(requestPath)));
-    if (!target.startsWith(ROOT)) { response.writeHead(404).end(); return; }
-    try {
-      const body = await readFile(target);
-      const type = CONTENT_TYPES[extname(target)] || 'application/octet-stream';
-      response.writeHead(200, {'content-type': type}).end(body);
-    } catch { response.writeHead(404).end(); }
-  });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  return server;
-}
-
-// Playable silence, so tests that assert on transport state are not at the
-// mercy of the browser rejecting an undecodable stub.
-function silentWav(seconds = 4, rate = 8000) {
-  const samples = Math.floor(seconds * rate);
-  const wav = Buffer.alloc(44 + samples * 2);
-  wav.write('RIFF', 0); wav.writeUInt32LE(36 + samples * 2, 4); wav.write('WAVE', 8);
-  wav.write('fmt ', 12); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
-  wav.writeUInt32LE(rate, 24); wav.writeUInt32LE(rate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
-  wav.write('data', 36); wav.writeUInt32LE(samples * 2, 40);
-  return wav;
-}
-
-async function loadHome(page, port, {audio = Buffer.alloc(44)} = {}) {
-  await page.route('**/api/extract-pdf', route => route.fulfill({json: {
-    text: PARAGRAPHS.map(item => item.text).join('\n\n'),
-    paragraphs: PARAGRAPHS,
-    all_paragraphs: PARAGRAPHS.map(item => ({...item, filter_reasons: []})),
-    filter_summary: {preset: 'prose', visible: PARAGRAPHS.length, hidden: 0, reasons: {}},
-  }}));
-  await page.route('**/api/synthesize', route => route.fulfill({contentType: 'audio/wav', body: audio}));
-  await page.goto(`http://127.0.0.1:${port}/`);
-}
-
-async function selectPdf(page) {
-  await page.locator('#pdf').setInputFiles({name: 'smoke.pdf', mimeType: 'application/pdf', buffer: PDF});
-  await expect(page.locator('#document-setup')).toBeVisible();
-}
-
-async function openReaderPage(page, port, options) {
-  await loadHome(page, port, options);
-  await selectPdf(page);
-  await page.getByRole('button', {name: 'Add and open'}).click();
-  await expect(page.locator('#pdf-status')).toContainText('2 reading paragraphs ready');
-  await expect(page.locator('#reader')).toBeVisible();
-}
+// Enough paragraphs that the Text list has to scroll, which is the only time
+// the reading position can be off screen.
+const MANY = Array.from({length: 40}, (_, index) => paragraph(
+  `m${index + 1}`,
+  `Paragraph number ${index + 1} in a long reading queue.`,
+  1180 - (index * 25),
+  1160 - (index * 25),
+));
 
 test.describe('local reader', () => {
   let server;
@@ -160,7 +78,7 @@ test.describe('local reader', () => {
     await expect(page.locator('#skip-bracketed-text')).toBeVisible();
     await page.locator('#skip-bracketed-text').check();
     await expect.poll(() => page.evaluate(() => localStorage.getItem('pdfreader.skip-bracketed-text'))).toBe('true');
-    await page.getByRole('button', {name: 'Add and open'}).click();
+    await page.getByRole('button', {name: 'Add to library'}).click();
     await expect(page.locator('#reader')).toBeVisible();
     await page.locator('#export-menu summary').click();
     await expect(page.getByRole('button', {name: 'Whole document'})).toBeEnabled();
@@ -286,7 +204,7 @@ test.describe('local reader', () => {
     // From here it is the ordinary import panel, named after the fetched file.
     await expect(page.locator('#document-setup')).toBeVisible();
     await expect(page.locator('#file-name')).toHaveText('A Printed Page.pdf');
-    await page.getByRole('button', {name: 'Add and open'}).click();
+    await page.getByRole('button', {name: 'Add to library'}).click();
     await expect(page.locator('#reader')).toBeVisible();
     await expect(page.locator('#reader-title')).toHaveText('A Printed Page.pdf');
     await page.getByRole('button', {name: 'Library', exact: true}).click();
@@ -303,7 +221,7 @@ test.describe('local reader', () => {
     await page.locator('#entry-name').fill('file:///etc/passwd');
     await page.getByRole('button', {name: 'Load'}).click();
     await expect(page.locator('#pdf-status')).toContainText('Enter an http:// or https:// address.');
-    await expect(page.getByRole('button', {name: 'Add and open'})).toBeDisabled();
+    await expect(page.getByRole('button', {name: 'Add to library'})).toBeDisabled();
   });
 
   test('a server without the endpoint says to restart it', async ({ page }) => {
@@ -362,5 +280,41 @@ test.describe('local reader', () => {
     expect(await other.evaluate(node => getComputedStyle(node).opacity)).toBe('1');
     await other.click();
     await expect(page.locator('#reader-progress')).toContainText('Paragraph 1 of 2');
+  });
+
+  test('the text list says which way the paragraph being read went', async ({ page }) => {
+    await openReaderPage(page, port, {paragraphs: MANY});
+    await page.getByRole('button', {name: 'Text'}).click();
+    const up = page.getByRole('button', {name: 'Reading above'});
+    const down = page.getByRole('button', {name: 'Reading below'});
+    // The list opens at the top, where the first paragraph already is.
+    await expect(up).toBeHidden();
+    await expect(down).toBeHidden();
+
+    await page.locator('#reader-drawer').evaluate(drawer => { drawer.scrollTop = drawer.scrollHeight; });
+    await expect(up).toBeVisible();
+    await expect(down).toBeHidden();
+    // The indicator is also the way back to it, and only scrolls the list.
+    await up.click();
+    await expect(up).toBeHidden();
+    await expect(page.locator('#reader-progress')).toContainText('Paragraph 1 of 40');
+
+    await page.locator('#reader-drawer .drawer-item').nth(30).click();
+    await expect(page.locator('#reader-progress')).toContainText('Paragraph 31 of 40');
+    await page.locator('#reader-drawer').evaluate(drawer => { drawer.scrollTop = 0; });
+    await expect(down).toBeVisible();
+    await expect(up).toBeHidden();
+
+    // Only the Text view has a reading position to point at.
+    await page.getByRole('button', {name: 'Outline'}).click();
+    await expect(down).toBeHidden();
+
+    // And listen-only hides the list altogether, so it must not leave an
+    // arrow floating over an empty panel.
+    await page.getByRole('button', {name: 'Text'}).click();
+    await page.locator('#reader-drawer').evaluate(drawer => { drawer.scrollTop = 0; });
+    await expect(down).toBeVisible();
+    await page.getByRole('button', {name: 'Listen only'}).click();
+    await expect(down).toBeHidden();
   });
 });

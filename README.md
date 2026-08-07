@@ -40,21 +40,29 @@ For PDFs with selectable text, choose **Docling text-only (no OCR)** for a faste
 - **Prose + captions** retains captions while applying the other prose filters.
 - **Full document** keeps every non-empty Docling text block. Changing a preset after a Docling extraction reapplies the saved structured result locally; it does not rerun conversion.
 
+The prose presets also drop text that was drawn inside a figure — axis labels, legend entries, stray numbers. That decision comes from geometry rather than word count: Docling reports the boxes of the pictures and tables it found, and a text block sitting inside one is figure furniture however many words it has. A caption is exempt, because it belongs to a figure without being drawn inside it, and the preset already decides whether captions are read.
+
 The filter summary explains what was hidden. A filtered block is never deleted from the extraction result, so selecting a broader preset restores it. **Skip [bracketed text] when speaking** is separate: it only omits bracketed text from spoken audio, not from the reading queue.
+
+**Add to library** stores the PDF and its preview immediately and closes the dialog; extracting the text runs in the background, and the document opens when it is ready. Until then its gallery card says so and cannot be opened. Extraction runs one document at a time, so several large imports cannot swamp the machine. If it fails — or is cut short by a reload or a closed tab — the card says why and offers **Try again**, which reuses the stored PDF and needs nothing from you.
 
 When you select a PDF, the browser calculates a SHA-256 digest locally and uses that digest as the document key. A small resume record goes to `localStorage`: extraction engine and preset, source paragraph and speech-part position, playback speed, bracket setting, zoom, and update time. Reopening a document from the gallery returns to that paragraph. Delete one gallery entry or use **Clear library** to remove saved reader data; clearing this site's local storage also removes resume positions.
 
-In the full-page reader, use `Space` to play/pause, `J`/`K` to move between paragraphs, `[`/`]` to change playback rate, `-`/`=` to zoom, and `Escape` to exit. The **Shortcuts** button shows the same list. Paragraph audio is always generated at Kokoro's natural speed; the speed control changes audio playback rate, so a change applies immediately instead of discarding prepared audio.
+In the full-page reader, use `Space` to play/pause, `J`/`K` to move between paragraphs, `[`/`]` to change playback rate, `-`/`=` to zoom, and `Escape` to exit. The **Shortcuts** button shows the same list. `Space` works wherever you are in the reader, including with a paragraph or the speed slider focused; a paragraph overlay answers `Enter` rather than `Space` so it never takes the play/pause key away. Pressing it while a paragraph is still being generated decides whether that paragraph plays when it arrives.
 
-Clicking a paragraph — in the PDF, the outline, or the text list — jumps there and starts reading it. Each paragraph also carries its own controls on hover: play/pause, highlight, and note. Their icons reflect the current state, so the paragraph being read shows a pause control and a highlighted paragraph shows a filled marker.
+**Voice** picks which of Kokoro's American English voices reads to you. The list comes from the server, so it cannot offer one Kokoro will refuse, and the first use of a voice downloads its (small) tensor. Changing it re-prepares the current paragraph; nothing you already heard is lost, because generated speech is cached per voice.
 
-The reader panel has three views. **Outline** is derived from Docling titles and section headers. **Text** lists the reading queue with each paragraph's preparation state, and highlights search matches. **Highlights** lists everything you have marked on the document: each entry quotes the source paragraph and shows any note under it. Selecting one only scrolls the PDF to that paragraph: whatever is playing keeps playing, and the reading position is unchanged. Search runs entirely in the browser over the current reading queue; results scroll to their source PDF paragraph and offer an explicit **Read from here** action. Searching outlines the matching paragraphs in the PDF but never hides or disables the others.
+Paragraph audio is always generated at Kokoro's natural speed; the speed control changes audio playback rate, so a change applies immediately instead of discarding prepared audio. That audio is kept in IndexedDB and reused, so reopening a document does not re-synthesise what you already heard, and an export of a passage you have listened to at normal speed is assembled locally without asking the model again. The cache holds 250 MB and drops the least recently used speech beyond that; deleting a document takes its audio with it.
+
+Clicking a paragraph — in the PDF, the outline, or the text list — jumps there and starts reading it, and takes the model off whatever it was generating for where you just left rather than queueing behind it. Each paragraph also carries its own controls on hover: play/pause, highlight, and note. Their icons reflect the current state, so the paragraph being read shows a pause control and a highlighted paragraph shows a filled marker. If a paragraph fails to convert, **Try this paragraph again** appears under the transport.
+
+The reader panel has three views. **Outline** is derived from Docling titles and section headers. **Text** lists the reading queue with each paragraph's preparation state, and highlights search matches. It does not scroll itself to follow the reader, but when the paragraph being read is off screen a **Reading above** or **Reading below** button appears against that edge of the list; pressing it scrolls the list there and changes nothing about playback. **Highlights** lists everything you have marked on the document: each entry quotes the source paragraph and shows any note under it. Selecting one only scrolls the PDF to that paragraph: whatever is playing keeps playing, and the reading position is unchanged. Search runs entirely in the browser over the current reading queue; results scroll to their source PDF paragraph and offer an explicit **Read from here** action. Searching outlines the matching paragraphs in the PDF but never hides or disables the others.
 
 **Highlight** and **Add note** — also available on hover over any PDF paragraph — write one record per paragraph: its source paragraph id, current PDF boxes, color, note text, excerpt, and timestamps, stored in IndexedDB. A note is a highlight with text on it; there is no separate bookmark. Highlights appear as a thin marker in the page margin, never over the text, and never copy the source PDF into that record. Hovering a paragraph that carries a note shows the note itself just below it. The highlight control toggles: using it on an already-highlighted paragraph removes it, and asks first when that would also delete an attached note. If an extraction later changes its paragraph ids, the saved excerpt is shown for recovery instead of silently moving the entry to a different paragraph.
 
 The **local library** keeps metadata such as file name, page count, last-opened time, position, and collection membership in IndexedDB, alongside the imported PDF itself. Importing asks the browser for persistent storage when it is available and checks quota before saving; if the quota is insufficient the import stops with an explanation rather than storing a document that cannot be opened. An older metadata-only entry is labelled **Available after reselecting** and asks you to select the original file, then reuses its saved extraction. The library provides per-document and whole-library deletion, plus collections that can be renamed or deleted without deleting the documents, highlights, or notes they contain.
 
-The reader can export the current paragraph, current section, or full reading queue as a WAV. Export runs only when requested, asks Kokoro for the reader's current playback speed so the file matches what you hear, honors the bracket-skipping option, and can be cancelled from the browser while generation is in progress. It is capped at 250,000 spoken characters per export and 4,000 characters per internal speech chunk.
+The reader can export the current paragraph, current section, or full reading queue as a WAV. Export runs only when requested, asks Kokoro for the reader's current playback speed so the file matches what you hear, honors the bracket-skipping option, and can be cancelled from the browser while generation is in progress — cancelling stops the model, rather than leaving it generating audio nobody will receive. It is capped at 250,000 spoken characters per export and 4,000 characters per internal speech chunk.
 
 **Listen only** uses the same queue and resume position while hiding the PDF and the reader panel views, and exposes play/pause and previous/next controls through the Media Session API when the browser supports it.
 
@@ -76,7 +84,8 @@ Source layout:
 | `local_webui.py` | the localhost server: extraction, speech, export, URL fetching |
 | `local_webui.html` | markup and the icon sprite only |
 | `webui/app.css` | the whole stylesheet, driven by tokens at the top |
-| `webui/app.mjs` | reader playback, import, dialogs, and the wiring between the parts |
+| `webui/app.mjs` | import, dialogs, storage, and the wiring between the parts |
+| `webui/lib/speech.mjs` | the reading engine: queue, conversion, audio cache, playback |
 | `webui/lib/text.mjs` | pure text and reading-queue helpers, unit tested |
 | `webui/lib/db.mjs` | the IndexedDB schema and every record operation |
 | `webui/lib/pdf-view.mjs` | rendered pages, zoom, and the paragraph overlays |
@@ -92,5 +101,16 @@ npm run test:unit   # node:test, no browser needed
 npm run test:browser
 python -m unittest discover -s tests
 ```
+
+`tests/fixtures/` holds a two-column paper and what the real tools make of it, so the extraction code is tested against real output rather than hand-built dictionaries. Regenerate them from the HTML kept beside them after changing how the fixture should look:
+
+```bash
+node scripts/print_url.mjs "file://$PWD/tests/fixtures/two-column-paper.source.html" tests/fixtures/two-column-paper.pdf
+pdftotext -bbox -enc UTF-8 tests/fixtures/two-column-paper.pdf tests/fixtures/two-column-paper.bbox.html
+.venv/bin/docling convert tests/fixtures/two-column-paper.pdf --to json --image-export-mode placeholder --output tests/fixtures --quiet --no-ocr
+mv tests/fixtures/two-column-paper.json tests/fixtures/two-column-paper.docling.json
+```
+
+`tests/fixtures/preset_cases.json` is shared: the reading preset is applied by `content_for_preset` on the server and again by `selectParagraphsForPreset` in the browser when you change it without re-extracting, and both are run against the same cases so they cannot drift apart.
 
 Kokoro is intentionally not vendored or modified in this repository; it is installed as a pinned dependency from its upstream project.

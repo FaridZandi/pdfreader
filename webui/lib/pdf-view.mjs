@@ -92,8 +92,12 @@ export function createPdfView({
     overlay.style.width = `${((box.bbox.r - box.bbox.l) / box.page_size.width) * 100}%`;
     overlay.style.height = `${((box.bbox.t - box.bbox.b) / box.page_size.height) * 100}%`;
     overlay.addEventListener('click', () => onSelect(sourceId));
+    // Enter reads from here; Space deliberately does not. Clicking a
+    // paragraph leaves the focus on it, so an overlay that also answered
+    // Space would take the reader's play/pause key away for the rest of the
+    // session - which is exactly what it used to do.
     overlay.addEventListener('keydown', event => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
+      if (event.key !== 'Enter') return;
       event.preventDefault();
       onSelect(sourceId);
     });

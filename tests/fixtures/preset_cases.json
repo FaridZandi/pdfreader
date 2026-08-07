@@ -1,0 +1,104 @@
+{
+  "note": "Shared by tests/test_preset_parity.py and tests/unit/text.test.mjs. The reading preset is applied twice in this repository - by content_for_preset in local_webui.py when a PDF is extracted, and by selectParagraphsForPreset in webui/lib/text.mjs when the preset is changed afterwards without re-extracting. Both must agree on every case here, or changing a preset would silently alter the reading queue.",
+  "cases": [
+    {
+      "name": "plain prose is read under every preset",
+      "paragraphs": [
+        {"id": "a", "text": "The opening paragraph.", "label": "text", "filter_reasons": []},
+        {"id": "b", "text": "A numbered heading.", "label": "section_header", "filter_reasons": []},
+        {"id": "c", "text": "The document title.", "label": "title", "filter_reasons": []},
+        {"id": "d", "text": "A bulleted point.", "label": "list_item", "filter_reasons": []}
+      ],
+      "expected": {
+        "prose": ["a", "b", "c", "d"],
+        "prose_captions": ["a", "b", "c", "d"],
+        "full": ["a", "b", "c", "d"]
+      },
+      "reasons": {"prose": {}, "prose_captions": {}, "full": {}}
+    },
+    {
+      "name": "captions are the difference between the two prose presets",
+      "paragraphs": [
+        {"id": "a", "text": "Body text.", "label": "text", "filter_reasons": []},
+        {"id": "b", "text": "Figure 1. A caption.", "label": "caption", "filter_reasons": ["caption"]}
+      ],
+      "expected": {
+        "prose": ["a"],
+        "prose_captions": ["a", "b"],
+        "full": ["a", "b"]
+      },
+      "reasons": {"prose": {"caption": 1}, "prose_captions": {}, "full": {}}
+    },
+    {
+      "name": "a label outside the prose set is not prose in either prose preset",
+      "paragraphs": [
+        {"id": "a", "text": "Body text.", "label": "text", "filter_reasons": []},
+        {"id": "b", "text": "1 42 7", "label": "table", "filter_reasons": []},
+        {"id": "c", "text": "A footnote marker.", "label": "footnote", "filter_reasons": []}
+      ],
+      "expected": {
+        "prose": ["a"],
+        "prose_captions": ["a"],
+        "full": ["a", "b", "c"]
+      },
+      "reasons": {"prose": {"non_prose": 2}, "prose_captions": {"non_prose": 2}, "full": {}}
+    },
+    {
+      "name": "every filter reason hides its block, and the first reason is the one reported",
+      "paragraphs": [
+        {"id": "a", "text": "Body text.", "label": "text", "filter_reasons": []},
+        {"id": "b", "text": "A Practical Reader 4", "label": "text", "filter_reasons": ["header_footer"]},
+        {"id": "c", "text": "References", "label": "section_header", "filter_reasons": ["reference_heading"]},
+        {"id": "d", "text": "[1] Smith, A. Important work.", "label": "list_item", "filter_reasons": ["reference_entry"]},
+        {"id": "e", "text": "b", "label": "text", "filter_reasons": ["figure_label", "isolated_token"]},
+        {"id": "f", "text": "Page width (mm)", "label": "text", "filter_reasons": ["figure_content"]},
+        {"id": "g", "text": "Accuracy", "label": "text", "filter_reasons": ["figure_content", "isolated_token"]}
+      ],
+      "expected": {
+        "prose": ["a"],
+        "prose_captions": ["a"],
+        "full": ["a", "b", "c", "d", "e", "f", "g"]
+      },
+      "reasons": {
+        "prose": {
+          "header_footer": 1,
+          "reference_heading": 1,
+          "reference_entry": 1,
+          "figure_label": 1,
+          "figure_content": 2
+        },
+        "prose_captions": {
+          "header_footer": 1,
+          "reference_heading": 1,
+          "reference_entry": 1,
+          "figure_label": 1,
+          "figure_content": 2
+        },
+        "full": {}
+      }
+    },
+    {
+      "name": "a caption reason never hides a block that is kept for its label",
+      "paragraphs": [
+        {"id": "a", "text": "Figure 2. A caption at the foot of every page.", "label": "caption", "filter_reasons": ["header_footer", "caption"]},
+        {"id": "b", "text": "Figure 3. An ordinary caption.", "label": "caption", "filter_reasons": ["caption"]}
+      ],
+      "expected": {
+        "prose": [],
+        "prose_captions": ["b"],
+        "full": ["a", "b"]
+      },
+      "reasons": {
+        "prose": {"caption": 2},
+        "prose_captions": {"header_footer": 1},
+        "full": {}
+      }
+    },
+    {
+      "name": "an empty document produces an empty queue",
+      "paragraphs": [],
+      "expected": {"prose": [], "prose_captions": [], "full": []},
+      "reasons": {"prose": {}, "prose_captions": {}, "full": {}}
+    }
+  ]
+}

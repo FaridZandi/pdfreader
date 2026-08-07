@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   filterSummaryMessage,
@@ -85,6 +86,25 @@ test('a caption reason alone does not hide a block from the captions preset', ()
   assert.deepEqual(selectParagraphsForPreset(all, 'prose_captions').paragraphs.map(i => i.id), ['c']);
   assert.deepEqual(selectParagraphsForPreset(all, 'prose').paragraphs, []);
 });
+
+// The other half of these cases runs in tests/test_preset_parity.py against
+// the server's content_for_preset. Changing a preset in the browser reapplies
+// the rules locally, so the two have to agree on every one of them.
+const presetCases = JSON.parse(
+  readFileSync(new URL('../fixtures/preset_cases.json', import.meta.url), 'utf8'),
+).cases;
+
+for (const {name, paragraphs, expected, reasons} of presetCases) {
+  test(`shared preset case: ${name}`, () => {
+    for (const [preset, ids] of Object.entries(expected)) {
+      const result = selectParagraphsForPreset(paragraphs, preset);
+      assert.deepEqual(result.paragraphs.map(item => item.id), ids, preset);
+      assert.deepEqual(result.filter_summary.reasons, reasons[preset], preset);
+      assert.equal(result.filter_summary.visible, ids.length, preset);
+      assert.equal(result.filter_summary.hidden, paragraphs.length - ids.length, preset);
+    }
+  });
+}
 
 test('the filter summary reads as a sentence', () => {
   assert.equal(filterSummaryMessage({visible: 186, hidden: 0}), '186 reading paragraphs ready.');

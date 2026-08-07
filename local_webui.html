@@ -73,7 +73,7 @@
               <option value="prose_captions">Prose and captions</option>
               <option value="full">Everything Docling finds</option>
             </select>
-            <p class="field-hint">Importing stores the PDF, renders a preview, and extracts text once.</p>
+            <p class="field-hint">Importing stores the PDF and renders a preview straight away. Extracting its text runs in the background, and the document opens when it is ready.</p>
           </div>
           <details class="disclosure">
             <summary>Advanced extraction</summary>
@@ -92,7 +92,7 @@
         </div>
         <div class="modal-foot">
           <button id="import-cancel" class="btn btn-ghost" type="button">Cancel</button>
-          <button id="extract" class="btn btn-primary" type="button" disabled>Add and open</button>
+          <button id="extract" class="btn btn-primary" type="button" disabled>Add to library</button>
         </div>
       </div>
     </div>
@@ -131,7 +131,12 @@
                 <output id="reader-playback-value">1.0×</output>
               </label>
             </div>
+            <label class="voice" for="reader-voice">
+              <span>Voice</span>
+              <select id="reader-voice"><option value="af_heart">Heart (female)</option></select>
+            </label>
             <p id="reader-status" role="status"></p>
+            <button id="reader-retry" class="btn btn-ghost btn-sm" type="button" hidden>Try this paragraph again</button>
           </div>
           <div class="tabs">
             <button id="reader-outline" type="button" disabled>Outline</button>
@@ -147,7 +152,17 @@
             <button id="reader-search-next" class="icon-btn" type="button" aria-label="Next result" disabled><svg><use href="#i-down"/></svg></button>
             <span id="reader-search-count">0 results</span>
           </div>
-          <section id="reader-drawer" hidden aria-live="polite"></section>
+          <!-- The drawer is the scrolling element, so the indicators have to
+               live outside it or they would scroll away with the list. -->
+          <div class="drawer-wrap">
+            <section id="reader-drawer" hidden aria-live="polite"></section>
+            <button id="drawer-jump-up" class="drawer-jump" type="button" hidden>
+              <svg><use href="#i-up"/></svg>Reading above
+            </button>
+            <button id="drawer-jump-down" class="drawer-jump" type="button" hidden>
+              <svg><use href="#i-down"/></svg>Reading below
+            </button>
+          </div>
           <div class="reader-tools">
             <button id="reader-highlight-toggle" class="btn btn-ghost" type="button" disabled><svg><use href="#i-mark"/></svg>Highlight</button>
             <button id="reader-annotate" class="btn btn-ghost" type="button" disabled><svg><use href="#i-note"/></svg>Note</button>

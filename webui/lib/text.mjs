@@ -10,6 +10,7 @@ const FILTER_LABELS = {
   reference_heading: 'reference headings',
   reference_entry: 'reference entries',
   figure_label: 'figure labels',
+  figure_content: 'text inside figures',
   isolated_token: 'isolated tokens',
   non_prose: 'non-prose blocks',
 };

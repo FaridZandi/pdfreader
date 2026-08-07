@@ -1,0 +1,1275 @@
+{
+  "schema_name": "DoclingDocument",
+  "version": "1.10.0",
+  "name": "two-column-paper",
+  "origin": {
+    "mimetype": "application/pdf",
+    "binary_hash": 9408912794708438874,
+    "filename": "two-column-paper.pdf"
+  },
+  "furniture": {
+    "self_ref": "#/furniture",
+    "children": [],
+    "content_layer": "furniture",
+    "name": "_root_",
+    "label": "unspecified"
+  },
+  "body": {
+    "self_ref": "#/body",
+    "children": [
+      {
+        "$ref": "#/texts/0"
+      },
+      {
+        "$ref": "#/texts/1"
+      },
+      {
+        "$ref": "#/texts/2"
+      },
+      {
+        "$ref": "#/texts/3"
+      },
+      {
+        "$ref": "#/texts/4"
+      },
+      {
+        "$ref": "#/texts/5"
+      },
+      {
+        "$ref": "#/texts/6"
+      },
+      {
+        "$ref": "#/texts/7"
+      },
+      {
+        "$ref": "#/texts/8"
+      },
+      {
+        "$ref": "#/tables/0"
+      },
+      {
+        "$ref": "#/texts/9"
+      },
+      {
+        "$ref": "#/texts/10"
+      },
+      {
+        "$ref": "#/texts/11"
+      },
+      {
+        "$ref": "#/texts/12"
+      },
+      {
+        "$ref": "#/texts/13"
+      },
+      {
+        "$ref": "#/texts/14"
+      },
+      {
+        "$ref": "#/texts/15"
+      },
+      {
+        "$ref": "#/texts/16"
+      },
+      {
+        "$ref": "#/texts/17"
+      },
+      {
+        "$ref": "#/groups/0"
+      },
+      {
+        "$ref": "#/texts/21"
+      },
+      {
+        "$ref": "#/texts/22"
+      },
+      {
+        "$ref": "#/pictures/0"
+      },
+      {
+        "$ref": "#/texts/29"
+      }
+    ],
+    "content_layer": "body",
+    "name": "_root_",
+    "label": "unspecified"
+  },
+  "groups": [
+    {
+      "self_ref": "#/groups/0",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [
+        {
+          "$ref": "#/texts/18"
+        },
+        {
+          "$ref": "#/texts/19"
+        },
+        {
+          "$ref": "#/texts/20"
+        }
+      ],
+      "content_layer": "body",
+      "name": "list",
+      "label": "list"
+    }
+  ],
+  "texts": [
+    {
+      "self_ref": "#/texts/0",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "section_header",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 81.46874660546875,
+            "t": 748.3930681669556,
+            "r": 531.2709743137084,
+            "b": 740.484819373208,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            52
+          ]
+        }
+      ],
+      "orig": "Column-Aware Reading Order for Local Document Speech",
+      "text": "Column-Aware Reading Order for Local Document Speech",
+      "level": 1
+    },
+    {
+      "self_ref": "#/texts/1",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 211.25390119775375,
+            "t": 725.4269814441856,
+            "r": 411.48189255983385,
+            "b": 706.4238038365982,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            81
+          ]
+        }
+      ],
+      "orig": "R. Halvorsen, M. Okonkwo, and J. Petrossian Institute for Applied Reading Systems",
+      "text": "R. Halvorsen, M. Okonkwo, and J. Petrossian Institute for Applied Reading Systems"
+    },
+    {
+      "self_ref": "#/texts/2",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 39.74999834375,
+            "t": 689.4858440814234,
+            "r": 295.03123779703117,
+            "b": 637.4908967739248,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            326
+          ]
+        }
+      ],
+      "orig": "Abstract -Reading  a  two-column  paper  aloud  fails  when  the extractor interleaves the left and right columns line by line. We describe a gutter-detection procedure that recovers the intended reading  order  from  word  positions  alone,  without  a  layout model, and evaluate it on four hundred pages of scientific text.",
+      "text": "Abstract -Reading  a  two-column  paper  aloud  fails  when  the extractor interleaves the left and right columns line by line. We describe a gutter-detection procedure that recovers the intended reading  order  from  word  positions  alone,  without  a  layout model, and evaluate it on four hundred pages of scientific text."
+    },
+    {
+      "self_ref": "#/texts/3",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "section_header",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 39.74999834375,
+            "t": 620.4269858191856,
+            "r": 113.53519666409599,
+            "b": 615.1561380376941,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            14
+          ]
+        }
+      ],
+      "orig": "1 Introduction",
+      "text": "1 Introduction",
+      "level": 1
+    },
+    {
+      "self_ref": "#/texts/4",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 39.74999834375,
+            "t": 605.0112637035767,
+            "r": 295.0309481632699,
+            "b": 525.0567490779175,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            412
+          ]
+        }
+      ],
+      "orig": "Text-to-speech systems for documents inherit whatever order the extractor produced. For single-column prose this is rarely a problem. For the two-column format used by  most conference  proceedings  it  is  catastrophic:  a  naive  top-tobottom  sweep  produces  a  sentence  from  the  left  column followed  by  an  unrelated  sentence  from  the  right,  and  the listener loses the thread within a paragraph.",
+      "text": "Text-to-speech systems for documents inherit whatever order the extractor produced. For single-column prose this is rarely a problem. For the two-column format used by  most conference  proceedings  it  is  catastrophic:  a  naive  top-tobottom  sweep  produces  a  sentence  from  the  left  column followed  by  an  unrelated  sentence  from  the  right,  and  the listener loses the thread within a paragraph."
+    },
+    {
+      "self_ref": "#/texts/5",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 39.74999834375,
+            "t": 512.7612675473267,
+            "r": 295.0309003746404,
+            "b": 458.3067518591675,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            278
+          ]
+        }
+      ],
+      "orig": "The difficulty is that a page is a bag of positioned words. Nothing in the extracted stream says where a column begins or  ends.  Layout-analysis  models  can  recover  this  structure, but they are large, slow, and awkward to run on a personal machine alongside a speech model.",
+      "text": "The difficulty is that a page is a bag of positioned words. Nothing in the extracted stream says where a column begins or  ends.  Layout-analysis  models  can  recover  this  structure, but they are large, slow, and awkward to run on a personal machine alongside a speech model."
+    },
+    {
+      "self_ref": "#/texts/6",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 39.74999834375,
+            "t": 446.01127032857664,
+            "r": 295.0287468132703,
+            "b": 366.80675567166753,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            401
+          ]
+        }
+      ],
+      "orig": "We  take  the  opposite  approach  and  ask  how  far  simple geometry  can  go.  Our  procedure  groups  words  into  visual rows, splits any row that spans a conspicuous horizontal gap, and then decides whether the page is genuinely two columns by  counting  how  many  independent  lines  fall  on  each  side. Pages that fail that test are read top to bottom, which is the less surprising failure.",
+      "text": "We  take  the  opposite  approach  and  ask  how  far  simple geometry  can  go.  Our  procedure  groups  words  into  visual rows, splits any row that spans a conspicuous horizontal gap, and then decides whether the page is genuinely two columns by  counting  how  many  independent  lines  fall  on  each  side. Pages that fail that test are read top to bottom, which is the less surprising failure."
+    },
+    {
+      "self_ref": "#/texts/7",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "section_header",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 39.74999834375,
+            "t": 349.6769971004355,
+            "r": 88.2534502581913,
+            "b": 344.406149318944,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            8
+          ]
+        }
+      ],
+      "orig": "2 Method",
+      "text": "2 Method",
+      "level": 1
+    },
+    {
+      "self_ref": "#/texts/8",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 39.74999834375,
+            "t": 334.2612749848267,
+            "r": 295.03060118819315,
+            "b": 267.0567598279175,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            368
+          ]
+        }
+      ],
+      "orig": "Let  a  page  carry  words  with  left  and  right  edges  and  a baseline. We  sort by baseline, then by left edge,  and accumulate  words  whose  baselines  agree  to  within  three points  into  a  single  row.  Rows  are  then  cut  wherever  the horizontal  distance  between  consecutive  words  exceeds  a gutter threshold set to five percent of the page width.",
+      "text": "Let  a  page  carry  words  with  left  and  right  edges  and  a baseline. We  sort by baseline, then by left edge,  and accumulate  words  whose  baselines  agree  to  within  three points  into  a  single  row.  Rows  are  then  cut  wherever  the horizontal  distance  between  consecutive  words  exceeds  a gutter threshold set to five percent of the page width."
+    },
+    {
+      "self_ref": "#/texts/9",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 317.71873676171873,
+            "t": 610.9298184607621,
+            "r": 562.4465369603907,
+            "b": 584.8579612826054,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            153
+          ]
+        }
+      ],
+      "orig": "Figure 1. Reading-order accuracy as the gutter threshold varies. The plateau between eighteen and thirty points is what makes a fixed threshold workable.",
+      "text": "Figure 1. Reading-order accuracy as the gutter threshold varies. The plateau between eighteen and thirty points is what makes a fixed threshold workable."
+    },
+    {
+      "self_ref": "#/texts/10",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 317.71873676171873,
+            "t": 570.5112651410767,
+            "r": 572.9951419304919,
+            "b": 528.0567489529175,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            245
+          ]
+        }
+      ],
+      "orig": "A line that ends in a hyphen is joined to the following line without  an  intervening  space,  which  restores  words  broken across  a  line  end.  Page  numbers  are  discarded  when  an isolated numeric line appears near the foot of the page.",
+      "text": "A line that ends in a hyphen is joined to the following line without  an  intervening  space,  which  restores  words  broken across  a  line  end.  Page  numbers  are  discarded  when  an isolated numeric line appears near the foot of the page."
+    },
+    {
+      "self_ref": "#/texts/11",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 317.71873676171873,
+            "t": 515.7612674223267,
+            "r": 572.9992658095256,
+            "b": 461.3067517341675,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            276
+          ]
+        }
+      ],
+      "orig": "The  two-column  decision  requires  at  least  three  lines wholly within the left half and three wholly within the right half. Material above the topmost column line is emitted first as  a  header,  and  anything  that  spans  the  gutter  below  that point is emitted last.",
+      "text": "The  two-column  decision  requires  at  least  three  lines wholly within the left half and three wholly within the right half. Material above the topmost column line is emitted first as  a  header,  and  anything  that  spans  the  gutter  below  that point is emitted last."
+    },
+    {
+      "self_ref": "#/texts/12",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "section_header",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 317.71873676171873,
+            "t": 444.17699316293556,
+            "r": 364.62102890572936,
+            "b": 438.90614538144405,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            9
+          ]
+        }
+      ],
+      "orig": "3 Results",
+      "text": "3 Results",
+      "level": 1
+    },
+    {
+      "self_ref": "#/texts/13",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 317.71873676171873,
+            "t": 428.76127104732666,
+            "r": 572.9989048311801,
+            "b": 374.30675535916754,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            280
+          ]
+        }
+      ],
+      "orig": "On  four  hundred  pages  drawn  from  three  proceedings,  the procedure  recovered the intended order for ninety-four percent of paragraphs. The residual failures cluster on pages with  floating  figures  that  straddle  the  gutter  and  on  pages whose columns are unbalanced.",
+      "text": "On  four  hundred  pages  drawn  from  three  proceedings,  the procedure  recovered the intended order for ninety-four percent of paragraphs. The residual failures cluster on pages with  floating  figures  that  straddle  the  gutter  and  on  pages whose columns are unbalanced."
+    },
+    {
+      "self_ref": "#/texts/14",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 317.71873676171873,
+            "t": 361.2612738598267,
+            "r": 572.9938400477167,
+            "b": 319.5567576404175,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            222
+          ]
+        }
+      ],
+      "orig": "We  compared  against  a  layout  model  of  two  hundred million parameters and found a four point deficit in exchange for a factor of sixty in latency, measured on a laptop with no accelerator available to either method.",
+      "text": "We  compared  against  a  layout  model  of  two  hundred million parameters and found a four point deficit in exchange for a factor of sixty in latency, measured on a laptop with no accelerator available to either method."
+    },
+    {
+      "self_ref": "#/texts/15",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "section_header",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 317.71873676171873,
+            "t": 302.4269990691855,
+            "r": 384.5867371952814,
+            "b": 297.156151287694,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            12
+          ]
+        }
+      ],
+      "orig": "4 Conclusion",
+      "text": "4 Conclusion",
+      "level": 1
+    },
+    {
+      "self_ref": "#/texts/16",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 317.71873676171873,
+            "t": 287.0112769535767,
+            "r": 572.9987509739768,
+            "b": 244.5567607654175,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            183
+          ]
+        }
+      ],
+      "orig": "Geometry alone recovers most of the reading order in twocolumn  documents.  The  remaining  errors  are  concentrated enough to be worth a targeted remedy rather than a general model.",
+      "text": "Geometry alone recovers most of the reading order in twocolumn  documents.  The  remaining  errors  are  concentrated enough to be worth a targeted remedy rather than a general model."
+    },
+    {
+      "self_ref": "#/texts/17",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "section_header",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 317.71873676171873,
+            "t": 228.17700216293554,
+            "r": 375.0187983724888,
+            "b": 222.90615438144403,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            10
+          ]
+        }
+      ],
+      "orig": "References",
+      "text": "References",
+      "level": 1
+    },
+    {
+      "self_ref": "#/texts/18",
+      "parent": {
+        "$ref": "#/groups/0"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "list_item",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 322.0077990830078,
+            "t": 211.9298350857622,
+            "r": 572.9974296826252,
+            "b": 197.10797743885541,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            109
+          ]
+        }
+      ],
+      "orig": "1. Ahmadi,  S.  Reading  order  recovery  from  raw  glyph  positions. Journal of Document Engineering, 2021.",
+      "text": "Ahmadi,  S.  Reading  order  recovery  from  raw  glyph  positions. Journal of Document Engineering, 2021.",
+      "enumerated": true,
+      "marker": "1."
+    },
+    {
+      "self_ref": "#/texts/19",
+      "parent": {
+        "$ref": "#/groups/0"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "list_item",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 320.94139662744124,
+            "t": 187.9298360857622,
+            "r": 572.9918911578565,
+            "b": 173.1079784388554,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            105
+          ]
+        }
+      ],
+      "orig": "2. Bell, T. and Ng, P. Column detection without supervision. Proceedings of the Workshop on Layout, 2019.",
+      "text": "Bell, T. and Ng, P. Column detection without supervision. Proceedings of the Workshop on Layout, 2019.",
+      "enumerated": true,
+      "marker": "2."
+    },
+    {
+      "self_ref": "#/texts/20",
+      "parent": {
+        "$ref": "#/groups/0"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "list_item",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 320.999986625,
+            "t": 164.67983705451218,
+            "r": 572.9986441742147,
+            "b": 149.1079794388554,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            82
+          ]
+        }
+      ],
+      "orig": "3. Cortez, D. Speech synthesis for long-form reading. Transactions on Audio, 2022.",
+      "text": "Cortez, D. Speech synthesis for long-form reading. Transactions on Audio, 2022.",
+      "enumerated": true,
+      "marker": "3."
+    },
+    {
+      "self_ref": "#/texts/21",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "section_header",
+      "prov": [
+        {
+          "page_no": 2,
+          "bbox": {
+            "l": 39.74999834375,
+            "t": 740.4269808191856,
+            "r": 214.96481079668163,
+            "b": 735.1561330376941,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            33
+          ]
+        }
+      ],
+      "orig": "A Appendix: Threshold Sensitivity",
+      "text": "A Appendix: Threshold Sensitivity",
+      "level": 1
+    },
+    {
+      "self_ref": "#/texts/22",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 2,
+          "bbox": {
+            "l": 39.74999834375,
+            "t": 724.2612587348268,
+            "r": 295.028564263278,
+            "b": 669.8067430466676,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            257
+          ]
+        }
+      ],
+      "orig": "The appendix reports the sensitivity of the gutter threshold to page width, which matters for documents that are not letter sized. The trend is flat across the range we measured, and the two proceedings that use A4 pages behave no differently from the rest.",
+      "text": "The appendix reports the sensitivity of the gutter threshold to page width, which matters for documents that are not letter sized. The trend is flat across the range we measured, and the two proceedings that use A4 pages behave no differently from the rest."
+    },
+    {
+      "self_ref": "#/texts/23",
+      "parent": {
+        "$ref": "#/pictures/0"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "caption",
+      "prov": [
+        {
+          "page_no": 2,
+          "bbox": {
+            "l": 317.71873676171873,
+            "t": 626.6798178045123,
+            "r": 526.1342649852572,
+            "b": 622.3579597201056,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            60
+          ]
+        }
+      ],
+      "orig": "Figure 2. Sensitivity of the gutter threshold to page width.",
+      "text": "Figure 2. Sensitivity of the gutter threshold to page width."
+    },
+    {
+      "self_ref": "#/texts/24",
+      "parent": {
+        "$ref": "#/pictures/0"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 2,
+          "bbox": {
+            "l": 330.82935601513327,
+            "t": 731.6769182077978,
+            "r": 334.5185540378753,
+            "b": 703.5878940838379,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            8
+          ]
+        }
+      ],
+      "orig": "Accuracy",
+      "text": "Accuracy"
+    },
+    {
+      "self_ref": "#/texts/25",
+      "parent": {
+        "$ref": "#/pictures/0"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 2,
+          "bbox": {
+            "l": 357.71483259521466,
+            "t": 742.0983674795445,
+            "r": 386.8152405677562,
+            "b": 738.4091694568025,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            8
+          ]
+        }
+      ],
+      "orig": "Proposed",
+      "text": "Proposed"
+    },
+    {
+      "self_ref": "#/texts/26",
+      "parent": {
+        "$ref": "#/pictures/0"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 2,
+          "bbox": {
+            "l": 357.71483259521466,
+            "t": 698.5983692920446,
+            "r": 383.7914123063356,
+            "b": 694.9091712693024,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            8
+          ]
+        }
+      ],
+      "orig": "Baseline",
+      "text": "Baseline"
+    },
+    {
+      "self_ref": "#/texts/27",
+      "parent": {
+        "$ref": "#/pictures/0"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 2,
+          "bbox": {
+            "l": 387.7148313452147,
+            "t": 640.0983717295445,
+            "r": 441.1219459917931,
+            "b": 636.4091737068024,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            15
+          ]
+        }
+      ],
+      "orig": "Page width (mm)",
+      "text": "Page width (mm)"
+    },
+    {
+      "self_ref": "#/texts/28",
+      "parent": {
+        "$ref": "#/pictures/0"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 2,
+          "bbox": {
+            "l": 553.4062269414062,
+            "t": 744.3483673857945,
+            "r": 565.0026496233642,
+            "b": 740.6591693630526,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            3
+          ]
+        }
+      ],
+      "orig": "100",
+      "text": "100"
+    },
+    {
+      "self_ref": "#/texts/29",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 2,
+          "bbox": {
+            "l": 317.71873676171873,
+            "t": 608.0112635785767,
+            "r": 572.9984734311979,
+            "b": 566.3067473591677,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            187
+          ]
+        }
+      ],
+      "orig": "Nothing in the measurement suggests a page-size dependent threshold would help, so we keep the single fixed fraction  of  the  page  width  described  in  Section  2  for  every document.",
+      "text": "Nothing in the measurement suggests a page-size dependent threshold would help, so we keep the single fixed fraction  of  the  page  width  described  in  Section  2  for  every document."
+    }
+  ],
+  "pictures": [
+    {
+      "self_ref": "#/pictures/0",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [
+        {
+          "$ref": "#/texts/23"
+        },
+        {
+          "$ref": "#/texts/24"
+        },
+        {
+          "$ref": "#/texts/25"
+        },
+        {
+          "$ref": "#/texts/26"
+        },
+        {
+          "$ref": "#/texts/27"
+        },
+        {
+          "$ref": "#/texts/28"
+        }
+      ],
+      "content_layer": "body",
+      "label": "picture",
+      "prov": [
+        {
+          "page_no": 2,
+          "bbox": {
+            "l": 317.00433349609375,
+            "t": 752.9572906494141,
+            "r": 573.0833129882812,
+            "b": 631.6301422119141,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            0
+          ]
+        }
+      ],
+      "captions": [
+        {
+          "$ref": "#/texts/23"
+        }
+      ],
+      "references": [],
+      "footnotes": [],
+      "annotations": []
+    }
+  ],
+  "tables": [
+    {
+      "self_ref": "#/tables/0",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "table",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 317.4439697265625,
+            "t": 692.2684478759766,
+            "r": 572.769775390625,
+            "b": 616.4027404785156,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            0
+          ]
+        }
+      ],
+      "captions": [],
+      "references": [],
+      "footnotes": [],
+      "data": {
+        "table_cells": [
+          {
+            "bbox": {
+              "l": 321.46873660546873,
+              "t": 130.90162914545556,
+              "r": 362.21337625465037,
+              "b": 134.59082716819762,
+              "coord_origin": "TOPLEFT"
+            },
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 1,
+            "end_row_offset_idx": 2,
+            "start_col_offset_idx": 0,
+            "end_col_offset_idx": 1,
+            "text": "Accuracy (%)",
+            "column_header": false,
+            "row_header": true,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "bbox": {
+              "l": 362.46092239746093,
+              "t": 116.65162973920553,
+              "r": 367.1555339854347,
+              "b": 120.3408277619476,
+              "coord_origin": "TOPLEFT"
+            },
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 0,
+            "end_row_offset_idx": 1,
+            "start_col_offset_idx": 0,
+            "end_col_offset_idx": 1,
+            "text": "A",
+            "column_header": false,
+            "row_header": true,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "bbox": {
+              "l": 358.46483256396465,
+              "t": 165.40162770795553,
+              "r": 411.3969831803333,
+              "b": 169.0908257306976,
+              "coord_origin": "TOPLEFT"
+            },
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 2,
+            "end_row_offset_idx": 3,
+            "start_col_offset_idx": 0,
+            "end_col_offset_idx": 1,
+            "text": "Gutter width (pt)",
+            "column_header": false,
+            "row_header": true,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "bbox": {
+              "l": 558.1171642451171,
+              "t": 109.15163005170552,
+              "r": 566.2490237530503,
+              "b": 112.84082807444759,
+              "coord_origin": "TOPLEFT"
+            },
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 0,
+            "end_row_offset_idx": 1,
+            "start_col_offset_idx": 1,
+            "end_col_offset_idx": 2,
+            "text": "98",
+            "column_header": true,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "bbox": {
+              "l": 558.3866992338866,
+              "t": 153.40162820795558,
+              "r": 566.2486256050368,
+              "b": 157.09082623069753,
+              "coord_origin": "TOPLEFT"
+            },
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 1,
+            "end_row_offset_idx": 2,
+            "start_col_offset_idx": 1,
+            "end_col_offset_idx": 2,
+            "text": "42",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          }
+        ],
+        "num_rows": 3,
+        "num_cols": 2,
+        "orientation": "rot_0",
+        "grid": [
+          [
+            {
+              "bbox": {
+                "l": 362.46092239746093,
+                "t": 116.65162973920553,
+                "r": 367.1555339854347,
+                "b": 120.3408277619476,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 0,
+              "end_row_offset_idx": 1,
+              "start_col_offset_idx": 0,
+              "end_col_offset_idx": 1,
+              "text": "A",
+              "column_header": false,
+              "row_header": true,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 558.1171642451171,
+                "t": 109.15163005170552,
+                "r": 566.2490237530503,
+                "b": 112.84082807444759,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 0,
+              "end_row_offset_idx": 1,
+              "start_col_offset_idx": 1,
+              "end_col_offset_idx": 2,
+              "text": "98",
+              "column_header": true,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            }
+          ],
+          [
+            {
+              "bbox": {
+                "l": 321.46873660546873,
+                "t": 130.90162914545556,
+                "r": 362.21337625465037,
+                "b": 134.59082716819762,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 1,
+              "end_row_offset_idx": 2,
+              "start_col_offset_idx": 0,
+              "end_col_offset_idx": 1,
+              "text": "Accuracy (%)",
+              "column_header": false,
+              "row_header": true,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "bbox": {
+                "l": 558.3866992338866,
+                "t": 153.40162820795558,
+                "r": 566.2486256050368,
+                "b": 157.09082623069753,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 1,
+              "end_row_offset_idx": 2,
+              "start_col_offset_idx": 1,
+              "end_col_offset_idx": 2,
+              "text": "42",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            }
+          ],
+          [
+            {
+              "bbox": {
+                "l": 358.46483256396465,
+                "t": 165.40162770795553,
+                "r": 411.3969831803333,
+                "b": 169.0908257306976,
+                "coord_origin": "TOPLEFT"
+              },
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 2,
+              "end_row_offset_idx": 3,
+              "start_col_offset_idx": 0,
+              "end_col_offset_idx": 1,
+              "text": "Gutter width (pt)",
+              "column_header": false,
+              "row_header": true,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 2,
+              "end_row_offset_idx": 3,
+              "start_col_offset_idx": 1,
+              "end_col_offset_idx": 2,
+              "text": "",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            }
+          ]
+        ]
+      },
+      "annotations": []
+    }
+  ],
+  "key_value_items": [],
+  "form_items": [],
+  "pages": {
+    "1": {
+      "size": {
+        "width": 612.0,
+        "height": 792.0
+      },
+      "page_no": 1
+    },
+    "2": {
+      "size": {
+        "width": 612.0,
+        "height": 792.0
+      },
+      "page_no": 2
+    }
+  }
+}

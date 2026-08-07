@@ -54,10 +54,46 @@ MAX_PDF_SIZE = 50 * 1024 * 1024
 READING_ORDERS = {"docling", "docling_no_ocr", "source", "columns"}
 EXTRACTION_PRESETS = {"prose", "prose_captions", "full"}
 PROSE_LABELS = {"text", "section_header", "title", "list_item"}
+# How much of a text block has to sit inside a picture or table before it is
+# treated as figure furniture rather than prose, and the point at which a
+# "figure" is really the whole page and would silence everything on it.
+FIGURE_CONTAINMENT = 0.8
+FIGURE_MAX_PAGE_SHARE = 0.9
+# The narrowest word-free band that can be a column gutter rather than a wide
+# space inside a justified line, and the share of a page's rows allowed to
+# cross a band before it stops looking like a gutter at all.
+MIN_GUTTER_WIDTH = 8.0
+GUTTER_ROW_TOLERANCE = 0.12
+# Kokoro's American English voices, which is what `lang_code="a"` below expects.
+# The first use of a voice downloads its (small) tensor from the model host.
+DEFAULT_VOICE = "af_heart"
+VOICES = (
+    ("af_heart", "Heart (female)"),
+    ("af_bella", "Bella (female)"),
+    ("af_nicole", "Nicole (female)"),
+    ("af_sarah", "Sarah (female)"),
+    ("af_sky", "Sky (female)"),
+    ("af_nova", "Nova (female)"),
+    ("af_aoede", "Aoede (female)"),
+    ("af_kore", "Kore (female)"),
+    ("af_river", "River (female)"),
+    ("af_alloy", "Alloy (female)"),
+    ("af_jessica", "Jessica (female)"),
+    ("am_michael", "Michael (male)"),
+    ("am_adam", "Adam (male)"),
+    ("am_echo", "Echo (male)"),
+    ("am_eric", "Eric (male)"),
+    ("am_fenrir", "Fenrir (male)"),
+    ("am_liam", "Liam (male)"),
+    ("am_onyx", "Onyx (male)"),
+    ("am_puck", "Puck (male)"),
+    ("am_santa", "Santa (male)"),
+)
+VOICE_IDS = {identifier for identifier, _ in VOICES}
 
 
-class ExportCancelled(Exception):
-    """Raised when the browser drops an export before it finishes generating."""
+class RequestCancelled(Exception):
+    """Raised when the browser drops a request before its audio is generated."""
 
 
 def _normalise_block_text(value: str) -> str:
@@ -124,6 +160,60 @@ def _looks_like_figure_label(
     return False
 
 
+def _rectangle(box: dict[str, object]) -> tuple[float, float, float, float]:
+    """A provenance box as (left, low, right, high), whichever way it was written."""
+    bbox = box.get("bbox", {})
+    left, right = float(bbox.get("l", 0)), float(bbox.get("r", 0))
+    top, bottom = float(bbox.get("t", 0)), float(bbox.get("b", 0))
+    return min(left, right), min(top, bottom), max(left, right), max(top, bottom)
+
+
+def _covered_by_figure(box: dict[str, object], figure: dict[str, object]) -> bool:
+    if box.get("page") != figure.get("page"):
+        return False
+    left, low, right, high = _rectangle(box)
+    area = (right - left) * (high - low)
+    if area <= 0:
+        return False
+    figure_left, figure_low, figure_right, figure_high = _rectangle(figure)
+    page_size = figure.get("page_size", {})
+    page_area = float(page_size.get("width", 0)) * float(page_size.get("height", 0))
+    # A "figure" the size of the page is a scan or a full-page graphic, and
+    # treating everything drawn on it as furniture would silence the page.
+    if page_area and (figure_right - figure_left) * (figure_high - figure_low) > page_area * FIGURE_MAX_PAGE_SHARE:
+        return False
+    overlap = (
+        max(0.0, min(right, figure_right) - max(left, figure_left))
+        * max(0.0, min(high, figure_high) - max(low, figure_low))
+    )
+    return overlap / area >= FIGURE_CONTAINMENT
+
+
+def _is_figure_content(
+    paragraph: dict[str, object],
+    figure_boxes: list[dict[str, object]],
+) -> bool:
+    """Whether every part of a block sits inside a picture or a table.
+
+    Axis labels, legend entries and stray numbers drawn inside a figure are
+    two to four words, so a word count cannot tell them from real short
+    prose.  Where they are on the page can: Docling reports the boxes of the
+    pictures and tables it found, and a block inside one of those is figure
+    furniture however many words it has.  A caption is exempt because it
+    belongs to the figure without being drawn inside it, and the preset
+    already decides whether captions are read.
+    """
+    if not figure_boxes or paragraph.get("label") == "caption":
+        return False
+    boxes = paragraph.get("boxes", [])
+    if not isinstance(boxes, list) or not boxes:
+        return False
+    return all(
+        any(_covered_by_figure(box, figure) for figure in figure_boxes)
+        for box in boxes
+    )
+
+
 def _looks_like_reference_entry(paragraph: dict[str, object]) -> bool:
     if paragraph.get("label") == "list_item":
         return True
@@ -131,8 +221,12 @@ def _looks_like_reference_entry(paragraph: dict[str, object]) -> bool:
     return bool(re.match(r"^(?:\[?\d+\]?|[A-Z][\w'’-]+,\s*[A-Z])", value))
 
 
-def annotate_filter_reasons(paragraphs: list[dict[str, object]]) -> list[dict[str, object]]:
+def annotate_filter_reasons(
+    paragraphs: list[dict[str, object]],
+    figure_boxes: list[dict[str, object]] | None = None,
+) -> list[dict[str, object]]:
     """Attach transparent, deterministic prose-filter reasons to source blocks."""
+    figure_boxes = figure_boxes or []
     occurrences: dict[str, set[int]] = {}
     for paragraph in paragraphs:
         page = _primary_page(paragraph)
@@ -161,10 +255,17 @@ def annotate_filter_reasons(paragraphs: list[dict[str, object]]) -> list[dict[st
         if normalized in {"references", "bibliography"} and label in {"title", "section_header", "text"}:
             reasons.append("reference_heading")
             reference_section = True
+        elif label in {"title", "section_header"}:
+            # A new heading ends the reference list.  Without this an appendix
+            # after the references is read as bibliography and dropped, and so
+            # is everything else to the end of the document.
+            reference_section = False
         elif reference_section and _looks_like_reference_entry(paragraph):
             reasons.append("reference_entry")
         if _looks_like_figure_label(paragraph, caption_boxes):
             reasons.append("figure_label")
+        if _is_figure_content(paragraph, figure_boxes):
+            reasons.append("figure_content")
         if label in {"text", "list_item"} and len(value.split()) == 1:
             reasons.append("isolated_token")
         annotated.append({**paragraph, "filter_reasons": reasons})
@@ -268,6 +369,57 @@ def _join_lines(lines: list[tuple[float, float, float, str]]) -> str:
     return text
 
 
+def _better_gutter(
+    best: tuple[float, float] | None,
+    candidate: tuple[float, float],
+    width: float,
+) -> tuple[float, float] | None:
+    start, end = candidate
+    centre = (start + end) / 2
+    if end - start < MIN_GUTTER_WIDTH:
+        return best
+    # A band against either margin is a margin, not a gutter.
+    if not 0.35 * width <= centre <= 0.65 * width:
+        return best
+    return candidate if best is None or end - start > best[1] - best[0] else best
+
+
+def _column_gutter(
+    rows: list[list[tuple[float, float, float, str]]],
+    width: float,
+) -> tuple[float, float] | None:
+    """The widest vertical band near the middle of the page that few rows cross.
+
+    A fixed fraction of the page width does not work as a gutter test: the
+    eight-millimetre column gap most proceedings use is narrower than five
+    percent of a letter page, so consecutive left- and right-column lines get
+    joined into one sentence.  The page states where its own gutter is, so
+    measure it instead of guessing.
+
+    A handful of rows are allowed to cross: a paper's title, its authors and
+    the occasional full-width figure span both columns, and demanding a
+    completely empty band would find no gutter on the very page that has one.
+    """
+    counts = [0] * (int(width) + 2)
+    for row in rows:
+        crossed: set[int] = set()
+        for left, right, _, _ in row:
+            crossed.update(range(max(0, int(left)), min(len(counts) - 1, int(right) + 1)))
+        for column in crossed:
+            counts[column] += 1
+    limit = int(len(rows) * GUTTER_ROW_TOLERANCE)
+    best: tuple[float, float] | None = None
+    start: int | None = None
+    for column, count in enumerate(counts):
+        if count <= limit:
+            if start is None:
+                start = column
+        elif start is not None:
+            best = _better_gutter(best, (start, column), width)
+            start = None
+    return best
+
+
 def _page_reading_order(page: dict[str, object]) -> str:
     width = float(page["width"])
     height = float(page["height"])
@@ -275,7 +427,7 @@ def _page_reading_order(page: dict[str, object]) -> str:
     if not words:
         return ""
 
-    # First form rows, then split any row across a conspicuous horizontal gutter.
+    # First form rows, then split any row that the page's gutter runs through.
     # This avoids treating simultaneous left/right-column lines as one sentence.
     rows: list[list[tuple[float, float, float, str]]] = []
     for word in sorted(words, key=lambda item: (item[2], item[0])):
@@ -284,13 +436,15 @@ def _page_reading_order(page: dict[str, object]) -> str:
         else:
             rows[-1].append(word)
 
+    gutter = _column_gutter(rows, width)
     lines: list[tuple[float, float, float, str]] = []
-    gutter = max(24, width * 0.05)
     for row in rows:
         part: list[tuple[float, float, float, str]] = []
         previous_right = 0.0
         for word in sorted(row, key=lambda item: item[0]):
-            if part and word[0] - previous_right > gutter:
+            # Cut only where the gutter itself passes between two words, so a
+            # stretched space in justified text is never mistaken for one.
+            if part and gutter and previous_right <= gutter[0] and word[0] >= gutter[1]:
                 lines.append((part[0][0], part[-1][1], part[0][2], " ".join(item[3] for item in part)))
                 part = []
             part.append(word)
@@ -300,8 +454,9 @@ def _page_reading_order(page: dict[str, object]) -> str:
 
     # Ignore an isolated page number near the bottom of the page.
     lines = [line for line in lines if not (line[3].isdigit() and line[2] > height * 0.88)]
-    left = [line for line in lines if line[1] <= width * 0.5]
-    right = [line for line in lines if line[0] >= width * 0.5]
+    middle = (gutter[0] + gutter[1]) / 2 if gutter else width * 0.5
+    left = [line for line in lines if line[1] <= middle]
+    right = [line for line in lines if line[0] >= middle]
 
     # Treat a page as two columns only when both sides have enough independent
     # lines. Otherwise ordinary top-to-bottom extraction is less surprising.
@@ -326,6 +481,64 @@ def _page_reading_order(page: dict[str, object]) -> str:
     else:
         ordered = sorted(lines, key=lambda item: item[2])
     return _join_lines(ordered)
+
+
+def _provenance_boxes(item: dict[str, object], pages: dict[str, object]) -> list[dict[str, object]]:
+    """Docling provenance as page-relative boxes, dropping anything unplaceable."""
+    boxes: list[dict[str, object]] = []
+    for provenance in item.get("prov", []):
+        page_number = str(provenance.get("page_no", ""))
+        page = pages.get(page_number, {})
+        bbox = provenance.get("bbox", {})
+        size = page.get("size", {})
+        if not bbox or not size:
+            continue
+        boxes.append(
+            {
+                "page": int(page_number),
+                "bbox": {key: float(bbox[key]) for key in ("l", "t", "r", "b")},
+                "page_size": {key: float(size[key]) for key in ("width", "height")},
+            }
+        )
+    return boxes
+
+
+def paragraphs_from_docling_document(
+    document: dict[str, object],
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    """Map Docling's JSON to source paragraphs, plus the figure and table boxes.
+
+    The boxes are returned alongside rather than folded in because they are not
+    reading material themselves: they only say which of the text blocks were
+    drawn inside a figure.
+    """
+    pages = document.get("pages", {})
+    paragraphs: list[dict[str, object]] = []
+    for text_index, item in enumerate(document.get("texts", [])):
+        value = str(item.get("text", "")).strip()
+        if not value:
+            continue
+        boxes = _provenance_boxes(item, pages)
+        # A Docling text item can span multiple regions or pages.  It is one
+        # logical piece of prose, so keep it as one reading-queue item and
+        # retain all of its boxes solely for PDF highlighting.  A rare text
+        # item without geometry remains readable in the Full document preset.
+        paragraphs.append(
+            {
+                "id": str(text_index),
+                "text": value,
+                "label": str(item.get("label", "")),
+                "page": int(boxes[0]["page"]) if boxes else None,
+                "boxes": boxes,
+            }
+        )
+    figure_boxes = [
+        box
+        for group in ("pictures", "tables")
+        for item in document.get(group, [])
+        for box in _provenance_boxes(item, pages)
+    ]
+    return paragraphs, figure_boxes
 
 
 def extract_with_docling(
@@ -353,45 +566,14 @@ def extract_with_docling(
     if result.returncode:
         message = result.stderr.decode("utf-8", errors="replace").strip()
         raise ValueError(message or "Docling could not convert this PDF.")
-    json_files = list(output_directory.rglob("*.json"))
+    # Sorted so the choice does not depend on directory order, even though the
+    # temporary directory holds exactly one file today.
+    json_files = sorted(output_directory.rglob("*.json"))
     if not json_files:
         raise ValueError("Docling completed without producing structured output.")
     document = json.loads(json_files[0].read_text(encoding="utf-8"))
-    pages = document.get("pages", {})
-    paragraphs: list[dict[str, object]] = []
-    for text_index, item in enumerate(document.get("texts", [])):
-        value = str(item.get("text", "")).strip()
-        if not value:
-            continue
-        boxes: list[dict[str, object]] = []
-        for provenance in item.get("prov", []):
-            page_number = str(provenance.get("page_no", ""))
-            page = pages.get(page_number, {})
-            bbox = provenance.get("bbox", {})
-            size = page.get("size", {})
-            if not bbox or not size:
-                continue
-            boxes.append(
-                {
-                    "page": int(page_number),
-                    "bbox": {key: float(bbox[key]) for key in ("l", "t", "r", "b")},
-                    "page_size": {key: float(size[key]) for key in ("width", "height")},
-                }
-            )
-        # A Docling text item can span multiple regions or pages.  It is one
-        # logical piece of prose, so keep it as one reading-queue item and
-        # retain all of its boxes solely for PDF highlighting.  A rare text
-        # item without geometry remains readable in the Full document preset.
-        paragraphs.append(
-            {
-                "id": str(text_index),
-                "text": value,
-                "label": str(item.get("label", "")),
-                "page": int(boxes[0]["page"]) if boxes else None,
-                "boxes": boxes,
-            }
-        )
-    return content_for_preset(annotate_filter_reasons(paragraphs), preset)
+    paragraphs, figure_boxes = paragraphs_from_docling_document(document)
+    return content_for_preset(annotate_filter_reasons(paragraphs, figure_boxes), preset)
 
 
 def extract_pdf_text(
@@ -518,34 +700,47 @@ class KokoroApp:
         self.pipeline: KPipeline = KPipeline(lang_code="a")
         self.lock = threading.Lock()
 
-    def synthesize(self, text: str, speed: float) -> bytes:
-        return to_wav(self._synthesize_chunks([text], speed))
+    def synthesize(
+        self,
+        text: str,
+        speed: float,
+        voice: str = DEFAULT_VOICE,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> bytes:
+        return to_wav(self._synthesize_chunks([text], speed, voice, should_stop))
 
     def synthesize_export(
         self,
         chunks_to_speak: list[str],
         speed: float,
+        voice: str = DEFAULT_VOICE,
         should_stop: Callable[[], bool] | None = None,
     ) -> bytes:
         """Generate one WAV from an explicit, client-selected reading queue."""
-        return to_wav(self._synthesize_chunks(chunks_to_speak, speed, should_stop))
+        return to_wav(self._synthesize_chunks(chunks_to_speak, speed, voice, should_stop))
 
     def _synthesize_chunks(
         self,
         chunks_to_speak: list[str],
         speed: float,
+        voice: str = DEFAULT_VOICE,
         should_stop: Callable[[], bool] | None = None,
     ) -> np.ndarray:
         chunks: list[np.ndarray] = []
         for text in chunks_to_speak:
             if should_stop is not None and should_stop():
-                raise ExportCancelled
+                raise RequestCancelled
             # Serializing inference prevents simultaneous browser requests
             # competing for the same model instance and system memory.  The
             # lock is taken per chunk rather than around the whole batch, so a
             # long export does not stall the paragraph the reader is waiting on.
             with self.lock:
-                for result in self.pipeline(text, voice="af_heart", speed=speed):
+                for result in self.pipeline(text, voice=voice, speed=speed):
+                    # Checked between the pieces the pipeline yields, not only
+                    # between chunks, so leaving stops generation part-way
+                    # through a long paragraph instead of at the end of it.
+                    if should_stop is not None and should_stop():
+                        raise RequestCancelled
                     if result.audio is not None:
                         chunks.append(result.audio.numpy())
         if not chunks:
@@ -575,6 +770,12 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
             path = urlparse(self.path).path
             if any(path.startswith(prefix) for prefix in ASSET_ROOTS):
                 self._serve_static(path)
+                return
+            if path == "/api/voices":
+                self._send_json(HTTPStatus.OK, {
+                    "default": DEFAULT_VOICE,
+                    "voices": [{"id": identifier, "label": label} for identifier, label in VOICES],
+                })
                 return
             if path not in ("/", "/index.html"):
                 self.send_error(HTTPStatus.NOT_FOUND)
@@ -631,13 +832,20 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
                 payload = json.loads(self.rfile.read(length))
                 text = str(payload.get("text", "")).strip()
                 speed = float(payload.get("speed", 1.0))
+                voice = self._voice_from(payload)
                 if not text:
                     raise ValueError("Enter some text first.")
                 if len(text) > MAX_TEXT_LENGTH:
                     raise ValueError(f"Text must be {MAX_TEXT_LENGTH:,} characters or fewer.")
                 if not 0.5 <= speed <= 2.0:
                     raise ValueError("Speed must be between 0.5 and 2.0.")
-                body = app.synthesize(text, speed)
+                body = app.synthesize(text, speed, voice, self._client_gone)
+            except RequestCancelled:
+                # The reader moved on, so this paragraph is no longer wanted.
+                # Stopping here frees the model for the one that is.
+                self.log_message("Synthesis cancelled by the browser")
+                self.close_connection = True
+                return
             except (ValueError, json.JSONDecodeError) as error:
                 self.log_error("Invalid synthesis request: %s", error)
                 self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
@@ -668,8 +876,8 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
                 speed = float(payload.get("speed", 1.0))
                 if not 0.5 <= speed <= 2.0:
                     raise ValueError("Speed must be between 0.5 and 2.0.")
-                body = app.synthesize_export(chunks, speed, self._client_gone)
-            except ExportCancelled:
+                body = app.synthesize_export(chunks, speed, self._voice_from(payload), self._client_gone)
+            except RequestCancelled:
                 # Cancelling in the browser has to stop the work here too, or
                 # the model keeps generating audio nobody will receive.
                 self.log_message("Export cancelled by the browser")
@@ -740,6 +948,12 @@ def handler_for(app: KokoroApp) -> type[BaseHTTPRequestHandler]:
                 self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(error)})
                 return
             self._send_json(HTTPStatus.OK, content)
+
+        def _voice_from(self, payload: dict[str, object]) -> str:
+            voice = str(payload.get("voice", "") or DEFAULT_VOICE)
+            if voice not in VOICE_IDS:
+                raise ValueError("Unknown voice.")
+            return voice
 
         def _client_gone(self) -> bool:
             """Whether the browser closed the connection, as a cancel does."""
