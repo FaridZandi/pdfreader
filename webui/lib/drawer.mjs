@@ -10,6 +10,7 @@ export function createDrawer({
   searchPrev,
   searchNext,
   tabs,
+  indicators = {},
   onJump = () => {},
   onReveal = () => {},
   onSearchChange = () => {},
@@ -139,6 +140,39 @@ export function createDrawer({
     openDrawer('Highlights', entries, query ? 'No highlights or notes match this search.' : 'Use Highlight or Add note on a PDF paragraph to save it here.');
   }
 
+  // The Text view deliberately does not follow the reader, so it needs to say
+  // which way the paragraph being read went. Only that view has one, and only
+  // while it is actually off screen.
+  function currentElement() {
+    return activeView === 'text' && currentIndex >= 0
+      ? drawer.querySelector(`[data-paragraph-index="${currentIndex}"]`)
+      : null;
+  }
+
+  function updateIndicators() {
+    const {up, down} = indicators;
+    if (!up || !down) return;
+    const target = currentElement();
+    // `offsetParent` is null whenever the list is not laid out at all, which
+    // is how listen-only mode hides it; measuring then would compare zeroes
+    // and leave an arrow pointing at nothing.
+    if (!target || drawer.hidden || !drawer.offsetParent) { up.hidden = true; down.hidden = true; return; }
+    const view = drawer.getBoundingClientRect();
+    const item = target.getBoundingClientRect();
+    up.hidden = item.bottom > view.top;
+    down.hidden = item.top < view.bottom;
+  }
+
+  function scrollToCurrent() {
+    const target = currentElement();
+    if (!target) return;
+    drawer.scrollTop = target.offsetTop - (drawer.clientHeight - target.offsetHeight) / 2;
+    updateIndicators();
+  }
+
+  drawer.addEventListener('scroll', updateIndicators, {passive: true});
+  [indicators.up, indicators.down].forEach(button => button?.addEventListener('click', scrollToCurrent));
+
   function updateSearchResults() {
     const query = normaliseSearchText(searchInput.value);
     searchResults = activeView === 'text' && query ? queue.flatMap((item, index) => item.searchText.includes(query) ? [{index, item}] : []) : [];
@@ -172,12 +206,13 @@ export function createDrawer({
       buildOutline();
     },
     setAnnotations(nextAnnotations) { annotations = nextAnnotations; },
-    setCurrent(index) { currentIndex = index; },
+    setCurrent(index) { currentIndex = index; updateIndicators(); },
     /** Switches view, either from a tab element or by name. */
     show(view) {
       const name = typeof view === 'string' ? view : (view === tabs.outline ? 'outline' : view === tabs.text ? 'text' : 'highlights');
       activateReaderView(tabs[name]);
       views[name]();
+      updateIndicators();
     },
     /** Repaints the open view in place. Conversion state changes for every
      *  prefetched paragraph, and rebuilding would drop scroll and focus. */
@@ -188,6 +223,7 @@ export function createDrawer({
         element.classList.toggle('active', index === currentIndex);
         element.querySelector('.drawer-meta').textContent = paragraphMeta(index);
       });
+      updateIndicators();
     },
     search: updateSearchResults,
     moveResult: moveSearchResult,
@@ -199,6 +235,7 @@ export function createDrawer({
       searchPrev.disabled = true;
       searchNext.disabled = true;
       drawer.hidden = true;
+      updateIndicators();
     },
   };
 }

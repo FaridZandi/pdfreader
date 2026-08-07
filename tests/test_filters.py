@@ -59,6 +59,18 @@ class ProseFilteringTests(unittest.TestCase):
         self.assertIn("reference_entry", all_paragraphs[2]["filter_reasons"])
         self.assertIn("isolated_token", all_paragraphs[3]["filter_reasons"])
 
+    def test_a_section_after_the_references_is_read_again(self):
+        all_paragraphs = annotate_filter_reasons([
+            paragraph("references", "References", "section_header"),
+            paragraph("entry", "[1] Smith, A. Important work.", "list_item"),
+            paragraph("appendix", "A Appendix: Derivations", "section_header"),
+            paragraph("step", "[3] follows from the definition above.", "list_item"),
+        ])
+
+        selected = content_for_preset(all_paragraphs, "prose")
+
+        self.assertEqual([item["id"] for item in selected["paragraphs"]], ["appendix", "step"])
+
     def test_bare_panel_label_requires_a_nearby_caption(self):
         all_paragraphs = annotate_filter_reasons([
             paragraph("caption", "Figure 2. A nearby caption.", "caption", page=2, top=450, bottom=480),

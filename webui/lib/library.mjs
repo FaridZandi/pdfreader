@@ -10,6 +10,7 @@ export function createLibrary({
   openDialog,
   onOpen = () => {},
   onReselect = () => {},
+  onRetryConversion = () => {},
   onDocumentRemoved = () => {},
   onCleared = () => {},
 }) {
@@ -151,9 +152,13 @@ export function createLibrary({
   }
 
   function documentCard(documentRecord, tags, highlightCount) {
+    // Text extraction runs in the background, so a card can exist before it
+    // has anything to read. An older record has no status and always has text.
+    const status = documentRecord.status || 'ready';
     const card = document.createElement('article');
     card.className = 'doc';
     const open = () => {
+      if (status !== 'ready') return;
       if (documentRecord.offline) onOpen(documentRecord);
       // A metadata-only entry needs its original file selected again; the
       // caller reuses the saved extraction rather than importing it twice.
@@ -207,7 +212,15 @@ export function createLibrary({
       row.append(bar, label);
       body.append(row);
     }
-    if (!documentRecord.offline) {
+    if (status !== 'ready') {
+      const badge = document.createElement('p');
+      badge.className = `doc-meta doc-badge ${status === 'converting' ? 'working' : 'failed'}`;
+      badge.style.marginTop = '9px';
+      badge.textContent = status === 'converting'
+        ? 'Extracting text…'
+        : documentRecord.statusMessage || 'Text extraction did not finish.';
+      body.append(badge);
+    } else if (!documentRecord.offline) {
       const pending = document.createElement('p');
       pending.className = 'doc-meta doc-badge pending';
       pending.style.marginTop = '9px';
@@ -231,8 +244,14 @@ export function createLibrary({
     const openButton = document.createElement('button');
     openButton.type = 'button';
     openButton.className = 'btn btn-ghost btn-sm';
-    openButton.textContent = documentRecord.offline ? 'Open' : 'Select original';
-    openButton.addEventListener('click', open);
+    if (status === 'failed') {
+      openButton.textContent = 'Try again';
+      openButton.addEventListener('click', () => onRetryConversion(documentRecord));
+    } else {
+      openButton.textContent = documentRecord.offline ? 'Open' : 'Select original';
+      openButton.disabled = status === 'converting';
+      openButton.addEventListener('click', open);
+    }
     const collect = document.createElement('button');
     collect.type = 'button';
     collect.className = 'icon-btn';

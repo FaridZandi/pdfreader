@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Column-Aware Reading Order for Local Document Speech</title>
+<style>
+  @page { size: Letter; margin: 14mm; }
+  body { font-family: Georgia, "Times New Roman", serif; font-size: 9.4pt; line-height: 1.32; margin: 0; }
+  header.title { text-align: center; margin-bottom: 10pt; }
+  header.title h1 { font-size: 15pt; margin: 0 0 6pt; line-height: 1.2; }
+  header.title .authors { font-size: 10pt; margin: 0 0 2pt; }
+  header.title .affil { font-size: 8.6pt; font-style: italic; color: #333; margin: 0; }
+  .cols { column-count: 2; column-gap: 8mm; text-align: justify; }
+  h2 { font-size: 10pt; margin: 9pt 0 3pt; }
+  p { margin: 0 0 5pt; text-indent: 10pt; }
+  p.first { text-indent: 0; }
+  .abstract { font-size: 9pt; margin: 0 0 8pt; }
+  figure { break-inside: avoid; margin: 6pt 0 8pt; text-align: center; }
+  figure .plot { border: 1px solid #444; height: 74pt; position: relative; }
+  figure .plot span { position: absolute; font-size: 7pt; }
+  figcaption { font-size: 8.2pt; text-align: left; margin-top: 3pt; }
+  ol.refs { font-size: 8.2pt; padding-left: 12pt; margin: 0; }
+  ol.refs li { margin-bottom: 2pt; }
+  .running { position: running(head); }
+</style>
+</head>
+<body>
+<header class="title">
+  <h1>Column-Aware Reading Order for Local Document Speech</h1>
+  <p class="authors">R. Halvorsen, M. Okonkwo, and J. Petrossian</p>
+  <p class="affil">Institute for Applied Reading Systems</p>
+</header>
+<div class="cols">
+  <p class="abstract first"><b>Abstract</b>&mdash;Reading a two-column paper aloud fails when the extractor
+  interleaves the left and right columns line by line. We describe a gutter-detection
+  procedure that recovers the intended reading order from word positions alone, without
+  a layout model, and evaluate it on four hundred pages of scientific text.</p>
+
+  <h2>1 Introduction</h2>
+  <p class="first">Text-to-speech systems for documents inherit whatever order the extractor
+  produced. For single-column prose this is rarely a problem. For the two-column format used by
+  most conference proceedings it is catastrophic: a naive top-to-bottom sweep produces a sentence
+  from the left column followed by an unrelated sentence from the right, and the listener loses
+  the thread within a paragraph.</p>
+  <p>The difficulty is that a page is a bag of positioned words. Nothing in the extracted stream
+  says where a column begins or ends. Layout-analysis models can recover this structure, but they
+  are large, slow, and awkward to run on a personal machine alongside a speech model.</p>
+  <p>We take the opposite approach and ask how far simple geometry can go. Our procedure groups
+  words into visual rows, splits any row that spans a conspicuous horizontal gap, and then decides
+  whether the page is genuinely two columns by counting how many independent lines fall on each
+  side. Pages that fail that test are read top to bottom, which is the less surprising failure.</p>
+
+  <h2>2 Method</h2>
+  <p class="first">Let a page carry words with left and right edges and a baseline. We sort by
+  baseline, then by left edge, and accumulate words whose baselines agree to within three points
+  into a single row. Rows are then cut wherever the horizontal distance between consecutive words
+  exceeds a gutter threshold set to five percent of the page width.</p>
+  <figure>
+    <div class="plot">
+      <span style="left:3pt;top:28pt;">Accuracy (%)</span>
+      <span style="left:44pt;top:14pt;">A</span>
+      <span style="left:96pt;top:36pt;">B</span>
+      <span style="left:40pt;bottom:2pt;">Gutter width (pt)</span>
+      <span style="right:6pt;top:6pt;">98</span>
+      <span style="right:6pt;bottom:14pt;">42</span>
+    </div>
+    <figcaption>Figure 1. Reading-order accuracy as the gutter threshold varies. The plateau
+    between eighteen and thirty points is what makes a fixed threshold workable.</figcaption>
+  </figure>
+  <p>A line that ends in a hyphen is joined to the following line without an intervening space,
+  which restores words broken across a line end. Page numbers are discarded when an isolated
+  numeric line appears near the foot of the page.</p>
+  <p>The two-column decision requires at least three lines wholly within the left half and three
+  wholly within the right half. Material above the topmost column line is emitted first as a
+  header, and anything that spans the gutter below that point is emitted last.</p>
+
+  <h2>3 Results</h2>
+  <p class="first">On four hundred pages drawn from three proceedings, the procedure recovered the
+  intended order for ninety-four percent of paragraphs. The residual failures cluster on pages
+  with floating figures that straddle the gutter and on pages whose columns are unbalanced.</p>
+  <p>We compared against a layout model of two hundred million parameters and found a four point
+  deficit in exchange for a factor of sixty in latency, measured on a laptop with no accelerator
+  available to either method.</p>
+
+  <h2>4 Conclusion</h2>
+  <p class="first">Geometry alone recovers most of the reading order in two-column documents. The
+  remaining errors are concentrated enough to be worth a targeted remedy rather than a general
+  model.</p>
+
+  <h2>References</h2>
+  <ol class="refs">
+    <li>Ahmadi, S. Reading order recovery from raw glyph positions. Journal of Document Engineering, 2021.</li>
+    <li>Bell, T. and Ng, P. Column detection without supervision. Proceedings of the Workshop on Layout, 2019.</li>
+    <li>Cortez, D. Speech synthesis for long-form reading. Transactions on Audio, 2022.</li>
+  </ol>
+</div>
+
+<div style="break-before: page;"></div>
+<div class="cols">
+  <h2>A Appendix: Threshold Sensitivity</h2>
+  <p class="first">The appendix reports the sensitivity of the gutter threshold to page width, which
+  matters for documents that are not letter sized. The trend is flat across the range we measured,
+  and the two proceedings that use A4 pages behave no differently from the rest.</p>
+  <figure style="position: relative;">
+    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMjAiIGhlaWdodD0iMTUwIj48cmVjdCB3aWR0aD0iMzIwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2VlZjFmNyIvPjxwb2x5bGluZSBwb2ludHM9IjIwLDEzMCA3MCw5MCAxMjAsNjAgMTcwLDQ1IDIyMCwzOCAyNzAsMzUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBvbHlsaW5lIHBvaW50cz0iMjAsMTM1IDcwLDEyMCAxMjAsMTAwIDE3MCw4OCAyMjAsODQgMjcwLDgyIiBmaWxsPSJub25lIiBzdHJva2U9IiM4ODgiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWRhc2hhcnJheT0iNiA0Ii8+PGxpbmUgeDE9IjIwIiB5MT0iMTQwIiB4Mj0iMzAwIiB5Mj0iMTQwIiBzdHJva2U9IiMyMjIiIHN0cm9rZS13aWR0aD0iMiIvPjxsaW5lIHgxPSIyMCIgeTE9IjEwIiB4Mj0iMjAiIHkyPSIxNDAiIHN0cm9rZT0iIzIyMiIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+" style="width:100%;display:block;">
+    <span style="position:absolute;left:2pt;top:30pt;font-size:7pt;transform:rotate(-90deg);">Accuracy</span>
+    <span style="position:absolute;left:40pt;top:8pt;font-size:7pt;">Proposed</span>
+    <span style="position:absolute;left:40pt;top:52pt;font-size:7pt;">Baseline</span>
+    <span style="position:absolute;left:70pt;bottom:14pt;font-size:7pt;">Page width (mm)</span>
+    <span style="position:absolute;right:8pt;top:6pt;font-size:7pt;">100</span>
+    <figcaption>Figure 2. Sensitivity of the gutter threshold to page width.</figcaption>
+  </figure>
+  <p>Nothing in the measurement suggests a page-size dependent threshold would help, so we keep the
+  single fixed fraction of the page width described in Section 2 for every document.</p>
+</div>
+</body>
+</html>
