@@ -64,13 +64,20 @@ function connect() {
 async function withStores(names, mode, work) {
   const database = await openDatabase();
   const transaction = database.transaction(names, mode);
-  const result = work(transaction);
-  await new Promise((resolve, reject) => {
+  const completion = new Promise((resolve, reject) => {
     transaction.oncomplete = resolve;
     transaction.onerror = () => reject(transaction.error);
     transaction.onabort = () => reject(transaction.error);
   });
-  return result;
+  try {
+    const result = await work(transaction);
+    await completion;
+    return result;
+  } catch (error) {
+    try { transaction.abort(); } catch { /* Already completed or aborted. */ }
+    await completion.catch(() => {});
+    throw error;
+  }
 }
 
 function fromRequest(request) {
@@ -93,6 +100,13 @@ export function getRecord(storeName, key) {
 export function allRecords(storeName) {
   return withStores(storeName, 'readonly', transaction =>
     fromRequest(transaction.objectStore(storeName).getAll()));
+}
+
+/** Reads related stores from a single consistent IndexedDB snapshot. */
+export function snapshotRecords(names) {
+  return withStores(names, 'readonly', async transaction =>
+    Object.fromEntries(await Promise.all(names.map(async name =>
+      [name, await fromRequest(transaction.objectStore(name).getAll())]))));
 }
 
 export function deleteRecord(storeName, key) {
@@ -184,5 +198,26 @@ export async function evictCachedAudio(limit = AUDIO_CACHE_BYTES) {
 export function clearEverything() {
   return withStores(ALL_STORES, 'readwrite', transaction => {
     ALL_STORES.forEach(name => transaction.objectStore(name).clear());
+  });
+}
+
+/** Replaces the library records in one IndexedDB transaction. */
+export function replaceEverything(records) {
+  for (const name of ALL_STORES) {
+    const key = DOCUMENT_KEYED.includes(name) ? 'key' : 'id';
+    if (!Array.isArray(records[name]) || records[name].some(record =>
+      !record || typeof record !== 'object' || typeof record[key] !== 'string' || !record[key])) {
+      throw new Error(`Invalid backup records for ${name}.`);
+    }
+    if (new Set(records[name].map(record => record[key])).size !== records[name].length) {
+      throw new Error(`Duplicate backup records for ${name}.`);
+    }
+  }
+  return withStores(ALL_STORES, 'readwrite', transaction => {
+    ALL_STORES.forEach(name => {
+      const store = transaction.objectStore(name);
+      store.clear();
+      records[name].forEach(record => store.put(record));
+    });
   });
 }

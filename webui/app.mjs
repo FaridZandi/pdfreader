@@ -2,6 +2,7 @@ import { createDrawer } from './lib/drawer.mjs';
 import { createLibrary } from './lib/library.mjs';
 import { createPdfView } from './lib/pdf-view.mjs';
 import { createSpeech, SYNTHESIS_SPEED } from './lib/speech.mjs';
+import {createLibraryBackup, downloadBackup, importLibraryBackup} from './lib/backup.mjs';
 import {
   allRecords,
   deleteRecord,
@@ -64,6 +65,10 @@ const drawerJumpUp = document.querySelector('#drawer-jump-up');
 const drawerJumpDown = document.querySelector('#drawer-jump-down');
 const newCollection = document.querySelector('#new-collection');
 const clearLibrary = document.querySelector('#clear-library');
+const exportLibrary = document.querySelector('#export-library');
+const importLibrary = document.querySelector('#import-library');
+const libraryBackupFile = document.querySelector('#library-backup-file');
+const libraryBackupStatus = document.querySelector('#library-backup-status');
 const libraryList = document.querySelector('#library-list');
 const libraryCount = document.querySelector('#library-count');
 const collectionList = document.querySelector('#collection-list');
@@ -978,6 +983,24 @@ readerListenOnly.addEventListener('click', () => {
 });
 newCollection.addEventListener('click', library.newCollection);
 clearLibrary.addEventListener('click', library.clearAll);
+exportLibrary.addEventListener('click', async () => {
+  try { downloadBackup(await createLibraryBackup()); libraryBackupStatus.textContent = 'Library backup downloaded. Generated speech cache is excluded and can be rebuilt.'; }
+  catch (error) { libraryBackupStatus.textContent = `Could not export library: ${error.message}`; }
+});
+importLibrary.addEventListener('click', () => libraryBackupFile.click());
+libraryBackupFile.addEventListener('change', async () => {
+  const file = libraryBackupFile.files?.[0]; libraryBackupFile.value = '';
+  if (!file) return;
+  try {
+    const backup = JSON.parse(await file.text());
+    if (backup?.format !== 'pdfreader-local-library' || backup.version !== 1) throw new Error('This is not a PDF Reader library export.');
+    if (!window.confirm('Importing replaces the library in this browser. A backup of the current library will download first. Continue?')) return;
+    downloadBackup(await createLibraryBackup());
+    await importLibraryBackup(backup);
+    await library.render();
+    libraryBackupStatus.textContent = 'Library restored. Generated speech will be recreated as needed.';
+  } catch (error) { libraryBackupStatus.textContent = `Could not import library: ${error.message}`; }
+});
 readerPrev.addEventListener('click', () => speech.jumpTo(speech.currentIndex - 1));
 readerNext.addEventListener('click', () => speech.jumpTo(speech.currentIndex + 1));
 readerExportParagraph.addEventListener('click', () => { exportMenu.open = false; exportAudio('paragraph'); });

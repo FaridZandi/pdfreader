@@ -36,6 +36,9 @@
           <h1>PDF Reader</h1>
           <p class="subtitle">Your local reading desk — your documents stay on this computer.</p>
         </div>
+        <button id="export-library" class="btn btn-ghost" type="button">Export library</button>
+        <button id="import-library" class="btn btn-ghost" type="button">Import library</button>
+        <input id="library-backup-file" type="file" accept="application/json,.json" hidden>
         <button id="load-url" class="btn btn-ghost" type="button"><svg><use href="#i-link"/></svg>From URL</button>
         <button id="choose-pdf" class="btn btn-primary" type="button"><svg><use href="#i-plus"/></svg>Add PDF</button>
         <input id="pdf" type="file" accept="application/pdf,.pdf" hidden>
@@ -52,6 +55,7 @@
           <div class="empty"><svg><use href="#i-file"/></svg><p>Add a PDF to start your local library. Text, position, highlights, and notes stay in this browser.</p></div>
         </div>
       </section>
+      <p id="library-backup-status" class="subtitle" role="status" aria-live="polite"></p>
     </main>
 
     <div class="modal" id="document-setup" hidden>
