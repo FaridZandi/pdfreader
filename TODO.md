@@ -161,3 +161,14 @@ waiting on a design.
 
 - **The hover note card overlaps the paragraph above it.** Inherent to an
   on-page popover at that width; the alternative is docking notes in the sidebar.
+
+## Done
+
+- [x] PDF-019 Write and verify the project brief for incoming agents
+  Priority: P2
+  Order: 1
+  Context: New Codex sessions receive a task snapshot but lack project orientation, recent decisions, user preferences, and awareness of other work. Inspect this project and produce its own concise, durable handoff document; do not assume undocumented history.
+  Done when: A root PROJECT_BRIEF.md explains the app purpose, supported entry points, how to run it, architecture and internal/external dependencies, data locations and persistence or backup behavior, development and verification commands, current work, and known pitfalls. Record established user preferences and decisions with references; explicitly label uncertainties. Link the canonical TODO.md and AGENTS.md rather than duplicating the backlog. Include a last-verified date and maintenance instructions. Add an AGENTS.md instruction to read and maintain the brief so incoming agents discover it.
+  Verify: Check commands, paths, entry points, architecture, dependency ownership, and data claims against current code and configuration. Review planning documents and the current Git state. Ensure references resolve, exclude secrets and personal data, and identify anything that could not be verified. Confirm the brief is concise enough to orient a new agent.
+  Notes: Documentation task only: inspect the project before writing. Do not invent user preferences or undocumented decisions. At completion follow the standing agent policy: verify, commit only assignment-related changes with the task ID, and push to the configured upstream; report blockers.
+  Evidence: 2026-10-11: Inspected current source/configuration, README, ROADMAP, historical planning backlog and Git state; verified routes, commands, dependency ownership, storage/backup behavior and known pitfalls against code. PROJECT_BRIEF.md is approximately 1,000 words with 20 resolving local references, a last-verified date, maintenance instructions and explicit uncertainty; AGENTS.md instructs agents to read/maintain it. npm run check, bash -n scripts/run.sh scripts/setup.sh, CLI --help and git diff --check passed; 19 JS unit, 30 Python and 38 browser tests passed. Python initially failed on sandbox localhost binds; Python/browser runs passed with escalation. Reader tests stub speech/extraction; live Kokoro quality, fresh Docling/OCR, fresh setup/downloads, storage durability and cross-platform compatibility were not assessed. Reviewed documentation for secrets/personal data; no runtime data included. Pre-existing backlog migration and docs/planning files remain outside this assignment commit.
