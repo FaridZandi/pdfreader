@@ -19,6 +19,7 @@ export function createSpeech({
   speed = () => 1,
   skipBracketed = () => false,
   documentKey = () => undefined,
+  cacheAudio = () => true,
   title = () => '',
   requestError,
   onPosition = () => {},
@@ -68,7 +69,7 @@ export function createSpeech({
     const speechText = textForSpeech(value, skipBracketed());
     if (!speechText) throw new Error('No speakable text remains after skipping bracketed text.');
     const voiceId = voice();
-    const {key, blob: hit} = await cached(speechText, voiceId);
+    const {key, blob: hit} = cacheAudio() ? await cached(speechText, voiceId) : {key: null};
     if (hit) return hit;
     const response = await fetch('/api/synthesize', {
       method: 'POST',

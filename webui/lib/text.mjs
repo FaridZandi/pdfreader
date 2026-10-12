@@ -87,6 +87,14 @@ export function splitForSpeech(value, limit = 440) {
       sentence = sentence.trim();
       if (sentence.length > limit) {
         for (const word of sentence.split(' ')) {
+          // Pasted URLs or unbroken strings can exceed the limit on their own.
+          if (word.length > limit) {
+            if (current) { result.push(current); current = ''; }
+            let offset = 0;
+            for (; offset + limit < word.length; offset += limit) result.push(word.slice(offset, offset + limit));
+            current = word.slice(offset);
+            continue;
+          }
           if ((current + ' ' + word).trim().length > limit && current) { result.push(current); current = word; }
           else current = `${current} ${word}`.trim();
         }

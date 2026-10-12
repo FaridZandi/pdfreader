@@ -35,12 +35,12 @@ test.describe('local reader', () => {
   test('extracts, starts the reader, jumps, persists resume, and preserves zoom controls', async ({ page }) => {
     await openReaderPage(page, port);
     await expect(page.getByRole('button', {name: 'Play'})).toBeVisible();
-    await expect(page.getByRole('button', {name: 'Text'})).toBeVisible();
+    await expect(page.getByRole('button', {name: 'Text', exact: true})).toBeVisible();
     await expect(page.getByRole('button', {name: 'Highlights'})).toBeVisible();
     await expect(page.getByRole('button', {name: 'Review'})).toHaveCount(0);
     await page.getByRole('button', {name: 'Outline'}).click();
     await expect(page.locator('#reader-drawer')).toContainText('No section headings were detected');
-    await page.getByRole('button', {name: 'Text'}).click();
+    await page.getByRole('button', {name: 'Text', exact: true}).click();
     await expect(page.locator('#reader-drawer')).toContainText('Local reader smoke test.');
     await page.getByRole('searchbox', {name: 'Search this reading queue'}).fill('no match');
     await expect(page.locator('#reader-drawer')).toContainText('No paragraphs match this search.');
@@ -268,7 +268,7 @@ test.describe('local reader', () => {
 
   test('searching marks matches without hiding any PDF paragraph', async ({ page }) => {
     await openReaderPage(page, port);
-    await page.getByRole('button', {name: 'Text'}).click();
+    await page.getByRole('button', {name: 'Text', exact: true}).click();
     await page.getByRole('searchbox', {name: 'Search this reading queue'}).fill('resume');
     await expect(page.locator('#reader-drawer .drawer-item')).toHaveCount(1);
     await expect(page.locator('.pdf-paragraph[data-source-id="p2"]')).toHaveClass(/search-match/);
@@ -284,7 +284,7 @@ test.describe('local reader', () => {
 
   test('the text list says which way the paragraph being read went', async ({ page }) => {
     await openReaderPage(page, port, {paragraphs: MANY});
-    await page.getByRole('button', {name: 'Text'}).click();
+    await page.getByRole('button', {name: 'Text', exact: true}).click();
     const up = page.getByRole('button', {name: 'Reading above'});
     const down = page.getByRole('button', {name: 'Reading below'});
     // The list opens at the top, where the first paragraph already is.
@@ -311,7 +311,7 @@ test.describe('local reader', () => {
 
     // And listen-only hides the list altogether, so it must not leave an
     // arrow floating over an empty panel.
-    await page.getByRole('button', {name: 'Text'}).click();
+    await page.getByRole('button', {name: 'Text', exact: true}).click();
     await page.locator('#reader-drawer').evaluate(drawer => { drawer.scrollTop = 0; });
     await expect(down).toBeVisible();
     await page.getByRole('button', {name: 'Listen only'}).click();

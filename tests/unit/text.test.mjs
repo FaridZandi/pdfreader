@@ -133,3 +133,10 @@ test('heading depth comes from numbering and is never invented', () => {
   assert.equal(headingDepth('Introduction'), 1);
   assert.equal(headingDepth('  4.1  Spaced'), 2);
 });
+
+test('an unbroken pasted string is bounded without losing characters', () => {
+  const value = 'x'.repeat(10001);
+  const chunks = splitForSpeech(value);
+  assert.ok(chunks.every(chunk => chunk.length <= 440));
+  assert.equal(chunks.join(''), value);
+});

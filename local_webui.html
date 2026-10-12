@@ -39,6 +39,7 @@
         <button id="export-library" class="btn btn-ghost" type="button">Export library</button>
         <button id="import-library" class="btn btn-ghost" type="button">Import library</button>
         <input id="library-backup-file" type="file" accept="application/json,.json" hidden>
+        <button id="paste-text" class="btn btn-ghost" type="button">Paste text</button>
         <button id="load-url" class="btn btn-ghost" type="button"><svg><use href="#i-link"/></svg>From URL</button>
         <button id="choose-pdf" class="btn btn-primary" type="button"><svg><use href="#i-plus"/></svg>Add PDF</button>
         <input id="pdf" type="file" accept="application/pdf,.pdf" hidden>
@@ -101,15 +102,31 @@
       </div>
     </div>
 
+    <dialog id="paste-dialog" class="paste-dialog" aria-labelledby="paste-title">
+      <form id="paste-form">
+        <h2 id="paste-title">Paste text</h2>
+        <p class="field-hint">Temporary reading: text and audio are not saved to your library. Closing the reader or reloading discards them.</p>
+        <label for="paste-input">Text to read aloud</label>
+        <textarea id="paste-input" rows="10" placeholder="Paste your text here"></textarea>
+        <p id="paste-error" role="alert"></p>
+        <div class="modal-foot">
+          <button id="paste-cancel" class="btn btn-ghost" type="button">Cancel</button>
+          <button class="btn btn-primary" type="submit">Read aloud</button>
+        </div>
+      </form>
+    </dialog>
+
     <section id="reader" hidden aria-label="PDF reader">
       <header class="reader-top">
         <button id="reader-close" class="btn btn-quiet" type="button"><svg><use href="#i-back"/></svg>Library</button>
+        <span id="reader-temporary" class="field-hint" hidden>Temporary · discarded on close or reload</span>
         <span id="reader-title" class="reader-title">PDF reader</span>
         <button id="reader-listen-only" class="btn btn-ghost btn-sm" type="button" disabled>Listen only</button>
         <button id="reader-help" class="icon-btn" type="button" aria-label="Keyboard shortcuts" aria-keyshortcuts="?"><svg><use href="#i-help"/></svg></button>
       </header>
       <div class="reader-body">
         <div class="pdf-pane">
+          <section id="pasted-text" aria-label="Pasted text" hidden></section>
           <div id="pdf-viewer" aria-label="Selected PDF"><p class="pdf-loading">The PDF will render here when reading begins.</p></div>
           <div class="zoom-float" title="Command/Ctrl + scroll zooms around the pointer">
             <button id="pdf-zoom-out" class="icon-btn" type="button" aria-label="Zoom out"><svg><use href="#i-minus"/></svg></button>

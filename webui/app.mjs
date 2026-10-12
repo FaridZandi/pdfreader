@@ -17,6 +17,13 @@ import {
   splitDocumentParagraphs,
 } from './lib/text.mjs';
 
+const pasteButton = document.querySelector('#paste-text');
+const pasteDialog = document.querySelector('#paste-dialog');
+const pasteInput = document.querySelector('#paste-input');
+const pasteError = document.querySelector('#paste-error');
+const pastedText = document.querySelector('#pasted-text');
+let temporaryReading = false;
+
 const skipBracketedText = document.querySelector('#skip-bracketed-text');
 const pdf = document.querySelector('#pdf');
 const choosePdf = document.querySelector('#choose-pdf');
@@ -171,7 +178,8 @@ const speech = createSpeech({
   prefetch: PREFETCH_COUNT,
   voice: () => readerVoice.value,
   speed: () => Number(readerPlaybackSpeed.value),
-  skipBracketed: () => skipBracketedText.checked,
+  skipBracketed: () => !temporaryReading && skipBracketedText.checked,
+  cacheAudio: () => !temporaryReading,
   documentKey: () => currentDocumentKey,
   title: () => readerTitle.textContent,
   requestError,
@@ -694,6 +702,10 @@ async function importFromUrl(url) {
 }
 
 function revealParagraph(index) {
+  if (temporaryReading) {
+    pastedText.children[index]?.scrollIntoView({block: 'nearest'});
+    return;
+  }
   pdfView.reveal(speech.items[index]?.sourceId);
 }
 
@@ -717,6 +729,10 @@ function highlightFor(sourceId) {
 }
 
 function refreshReaderState() {
+  [...pastedText.children].forEach((element, index) => {
+    element.classList.toggle('active', index === speech.currentIndex);
+    element.setAttribute('aria-current', String(index === speech.currentIndex));
+  });
   drawer.refresh();
   updateReaderProgress();
   refreshOverlays();
@@ -729,7 +745,18 @@ function stopReader() {
   pdfView.clear();
   reader.hidden = true;
   documentSetup.hidden = true;
-  reader.classList.remove('listen-only');
+  reader.classList.remove('listen-only', 'text-reading');
+  if (temporaryReading) {
+    preparedText = '';
+    preparedParagraphs = [];
+    allPreparedParagraphs = [];
+    pastedText.replaceChildren();
+    drawer.reset();
+    drawer.setQueue([]);
+    readerDrawer.replaceChildren();
+    temporaryReading = false;
+    pasteButton.focus();
+  }
   readerListenOnly.textContent = 'Listen only';
   exportMenu.open = false;
   readerProgressFill.style.width = '0%';
@@ -881,9 +908,9 @@ async function reclaimAbandonedConversions() {
   } catch { /* Library storage is optional. */ }
 }
 
-async function openReader() {
+async function openReader({temporary = false} = {}) {
   const value = preparedText.trim();
-  if (!pdf.files[0] || !value) {
+  if ((!temporary && !pdf.files[0]) || !value) {
     pdfStatus.textContent = 'Choose and extract a PDF before opening the reader.';
     return;
   }
@@ -891,6 +918,11 @@ async function openReader() {
     ? preparedParagraphs.map(paragraph => ({...paragraph, text: paragraph.text, sourceId: paragraph.id}))
     : splitDocumentParagraphs(value).map(text => ({text, sourceId: null}));
   if (!paragraphs.length) return;
+  temporaryReading = temporary;
+  reader.classList.toggle('text-reading', temporary);
+  document.querySelector('#reader-temporary').hidden = !temporary;
+  pastedText.hidden = !temporary;
+  pdfViewer.hidden = temporary;
   reader.hidden = false;
   if (!speech.load(paragraphs)) return;
   drawer.reset();
@@ -908,10 +940,24 @@ async function openReader() {
       setReaderAnnotations(await recordsForDocument('annotations', currentDocumentKey));
     } catch { setReaderAnnotations([]); }
   } else { setReaderAnnotations([]); }
-  drawer.show('outline');
+  drawer.show(temporary ? 'text' : 'outline');
   readerStatus.textContent = `Opening ${speech.items.length} paragraphs in the advanced reader...`;
   const resumed = speech.begin({sourceId: pendingResume?.sourceId, partIndex: pendingResume?.speechChunk});
   if (resumed) readerStatus.textContent = `Resuming paragraph ${speech.currentIndex + 1}...`;
+  if (temporary) {
+    pastedText.replaceChildren(...paragraphs.map((paragraph, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'pasted-paragraph';
+      button.textContent = paragraph.text;
+      button.addEventListener('click', () => speech.jumpTo(index, {play: true}));
+      return button;
+    }));
+    refreshReaderState();
+    speech.resume();
+    readerClose.focus();
+    return;
+  }
   try {
     await pdfView.render(pdf.files[0], preparedParagraphs);
     speech.resume();
@@ -1043,3 +1089,33 @@ document.addEventListener('keydown', event => {
   if (event.key === '=') { event.preventDefault(); pdfView.zoomBy(0.15); }
 });
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && !reader.hidden) reader.focus?.(); });
+
+// Pasted reading deliberately has no document key, resume record or audio cache.
+pasteButton.addEventListener('click', () => {
+  pasteInput.value = '';
+  pasteError.textContent = '';
+  pasteDialog.showModal();
+  pasteInput.focus();
+});
+document.querySelector('#paste-cancel').addEventListener('click', () => pasteDialog.close());
+document.querySelector('#paste-form').addEventListener('submit', event => {
+  event.preventDefault();
+  if (!pasteInput.value.trim()) {
+    pasteError.textContent = 'Paste some text before reading aloud.';
+    pasteInput.focus();
+    return;
+  }
+  documentSelectionVersion += 1;
+  autoOpenKey = undefined;
+  currentDocumentKey = undefined;
+  currentDocumentFile = undefined;
+  pendingResume = undefined;
+  readerTitle.textContent = 'Pasted text';
+  documentSetup.hidden = true;
+  preparedText = pasteInput.value.trim();
+  preparedParagraphs = splitDocumentParagraphs(preparedText).map((text, index) => ({id: `paste-${index}`, text, label: 'text'}));
+  allPreparedParagraphs = [];
+  pasteInput.value = '';
+  pasteDialog.close();
+  openReader({temporary: true});
+});
